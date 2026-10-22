@@ -32,7 +32,7 @@ def reset() -> None:
     scene.render.engine = "CYCLES"
     scene.render.fps = 24
     scene.frame_start = 1
-    scene.frame_end = 48
+    scene.frame_end = 32
 
 
 def _active(obj: bpy.types.Object) -> None:
@@ -399,29 +399,44 @@ def humanoid_actions() -> dict:
         "RightArm": [(1, (0, 0, 0)), (5, (0.55, 0, -0.3)), (12, (0, 0, 0))],
         "Hips": [(1, (0, 0, 0)), (5, (-0.08, 0, 0)), (12, (0, 0, 0))],
     }
+    # Plant on the back, not past 90° (that inverts the mesh into the air).
     death = {
-        "Hips": [(1, (0, 0, 0)), (10, (0.55, 0, 0)), (24, (1.58, 0, 0))],
-        "Spine": [(1, (0, 0, 0)), (10, (0.28, 0, 0.08)), (24, (0.22, 0, 0))],
-        "Head": [(1, (0, 0, 0)), (10, (0.35, 0, 0)), (24, (0.25, 0.12, 0))],
-        "LeftArm": [(1, (0, 0, 0)), (24, (0.55, 0.35, 0.2))],
-        "RightArm": [(1, (0, 0, 0)), (24, (0.6, -0.25, -0.15))],
-        "LeftUpLeg": [(1, (0, 0, 0)), (24, (0.35, 0, 0.15))],
-        "RightUpLeg": [(1, (0, 0, 0)), (24, (0.28, 0, -0.18))],
-        "LeftLeg": [(1, (0, 0, 0)), (24, (0.2, 0, 0))],
-        "RightLeg": [(1, (0, 0, 0)), (24, (0.18, 0, 0))],
+        "Hips": [(1, (0, 0, 0)), (12, (0.70, 0, 0)), (32, (1.22, 0, 0))],
+        "Spine": [(1, (0, 0, 0)), (12, (0.10, 0, 0.04)), (32, (0.06, 0, 0))],
+        "Spine1": [(1, (0, 0, 0)), (32, (0.04, 0, 0))],
+        "Head": [(1, (0, 0, 0)), (12, (0.16, 0, 0)), (32, (0.08, 0.06, 0))],
+        "LeftArm": [(1, (0, 0, 0)), (32, (0.85, 0.55, 0.22))],
+        "RightArm": [(1, (0, 0, 0)), (32, (0.88, -0.48, -0.20))],
+        "LeftForeArm": [(1, (0, 0, 0)), (32, (0.28, 0, 0))],
+        "RightForeArm": [(1, (0, 0, 0)), (32, (0.24, 0, 0))],
+        "LeftUpLeg": [(1, (0, 0, 0)), (32, (0.18, 0, 0.16))],
+        "RightUpLeg": [(1, (0, 0, 0)), (32, (0.16, 0, -0.14))],
+        "LeftLeg": [(1, (0, 0, 0)), (32, (0.22, 0, 0))],
+        "RightLeg": [(1, (0, 0, 0)), (32, (0.20, 0, 0))],
     }
     return {"idle": idle, "walk": walk, "attack": attack, "hit": hit, "death": death}
 
 
-def humanoid_locations() -> dict:
+def death_locations(hip_rest: float, plant: float = 0.20) -> dict:
+    """Bone local Y is along the hip bone (world up). Negative Y plants the corpse."""
+    drop = plant - hip_rest
     return {
         "death": {
-            "Hips": [(1, (0.0, 0.0, 0.0)), (10, (0.0, 0.20, -0.32)), (24, (0.0, 0.48, -0.78))],
+            "Hips": [
+                (1, (0.0, 0.0, 0.0)),
+                (12, (0.0, drop * 0.42, 0.10)),
+                (32, (0.0, drop, 0.16)),
+            ],
         }
     }
 
 
+def humanoid_locations() -> dict:
+    return death_locations(0.90, 0.22)
+
+
 def skin_groups(arm: bpy.types.Object, groups: dict[str, list[bpy.types.Object]]) -> None:
+    auto: list[bpy.types.Object] = []
     for bone, meshes in groups.items():
         for mesh in meshes:
             if mesh is None or mesh.type != "MESH":
@@ -429,7 +444,12 @@ def skin_groups(arm: bpy.types.Object, groups: dict[str, list[bpy.types.Object]]
             triangulate(mesh)
             if mesh.data:
                 mesh.data.name = mesh.name[:60]
-            bind_mesh(mesh, arm, bone)
+            if mesh.name in ("Skin_torso", "Skin_head"):
+                auto.append(mesh)
+            else:
+                bind_mesh(mesh, arm, bone)
+    for mesh in auto:
+        bind_auto(mesh, arm)
 
 
 def deform_cranium(obj: bpy.types.Object) -> None:
@@ -668,18 +688,36 @@ def drape_cloth(obj: bpy.types.Object, folds: int = 8, amp: float = 0.04, loc_z:
 
 def finish_cloth(obj: bpy.types.Object, folds: int = 8, amp: float = 0.04, loc_z: float = 0.55, depth: float = 1.05) -> bpy.types.Object:
     """Keep a draped silhouette — do not remesh or decimate cloth into shards."""
-    subdivide(obj, 2)
+    subdivide(obj, 1)
     drape_cloth(obj, folds=folds, amp=amp, loc_z=loc_z, depth=depth)
-    displace(obj, 0.0024, 0.16)
+    displace(obj, 0.0022, 0.16)
     triangulate(obj)
     shade_smooth(obj)
     unwrap(obj)
     return obj
 
 
+def scallop_hem(obj: bpy.types.Object, loc_z: float, depth: float, waves: int = 7, drop: float = 0.07) -> None:
+    """Wavy continuous hem — never separate shard cubes."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    z0 = loc_z - depth * 0.5
+    for v in bm.verts:
+        h = (v.co.z - z0) / max(0.01, depth)
+        if h < 0.28:
+            ang = math.atan2(v.co.y, v.co.x)
+            fall = drop * (0.35 + 0.65 * abs(math.sin(ang * waves + h * 1.4)))
+            v.co.z -= fall * (1.0 - h / 0.28)
+            v.co.x += math.cos(ang) * 0.012 * (1.0 - h / 0.28)
+            v.co.y += math.sin(ang) * 0.010 * (1.0 - h / 0.28)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+
 def make_robe(name: str, loc_z: float, r1: float, r2: float, depth: float, folds: int = 8) -> bpy.types.Object:
     mid = (r1 + r2) * 0.5
-    obj = mesh_cyl(mid, depth, (0, 0.04, loc_z), verts=40, name=name)
+    obj = mesh_cyl(mid, depth, (0, 0.05, loc_z), verts=36, name=name)
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     z0 = loc_z - depth * 0.5
@@ -690,39 +728,86 @@ def make_robe(name: str, loc_z: float, r1: float, r2: float, depth: float, folds
         scale = target / max(0.01, mid)
         v.co.x *= scale
         v.co.y *= scale
-        v.co.y += 0.03 * (1.0 - h)
+        v.co.y += 0.04 * (1.0 - h)
     bm.to_mesh(obj.data)
     bm.free()
     obj.data.update()
-    return finish_cloth(obj, folds=folds, amp=0.038, loc_z=loc_z, depth=depth)
+    scallop_hem(obj, loc_z, depth, waves=8, drop=0.08)
+    return finish_cloth(obj, folds=folds, amp=0.032, loc_z=loc_z, depth=depth)
 
 
-def make_tatters(bone_z: float = 0.22) -> list[bpy.types.Object]:
+def make_cloth_cards(z: float = 0.16, prefix: str = "Cloth_fringe") -> list[bpy.types.Object]:
+    """Layered alpha-cut hanging strips, thin as cloth cards not cubes."""
     parts = []
-    for i, x in enumerate((-0.18, -0.06, 0.06, 0.18)):
-        strip = mesh_cube((0.07, 0.018, 0.36), (x, 0.08, bone_z), (0.12 * (i - 1.5), 0.06 * (i % 2), 0.04), name=f"Tatter_{i}")
-        finish_cloth(strip, folds=4, amp=0.018, loc_z=bone_z, depth=0.36)
-        parts.append(strip)
+    for i in range(8):
+        ang = (i / 8.0) * math.tau + 0.18
+        x = math.cos(ang) * 0.22
+        y = math.sin(ang) * 0.16 + 0.07
+        card = mesh_cube(
+            (0.09, 0.004, 0.30),
+            (x, y, z),
+            (0.18 + 0.08 * (i % 3), 0.05 * math.sin(i), ang),
+            name=f"{prefix}{i}",
+        )
+        finish_cloth(card, folds=3, amp=0.012, loc_z=z, depth=0.30)
+        parts.append(card)
     return parts
 
 
 def make_hood(loc, name: str = "Hood_cowl") -> bpy.types.Object:
     x, y, z = loc
-    cowl = mesh_uvsphere(0.18, (x, y - 0.02, z + 0.04), name, 24, 16)
-    cowl.scale = (0.96, 1.18, 1.06)
+    cowl = mesh_uvsphere(0.19, (x, y - 0.04, z + 0.03), name, 28, 16)
+    cowl.scale = (1.02, 1.22, 1.10)
     apply_scale(cowl)
-    face = mesh_cube((0.24, 0.30, 0.24), (x, y + 0.20, z + 0.02), name="cut_hood_face")
-    boolean_diff(cowl, face)
-    rim = mesh_torus(0.11, 0.016, (x, y + 0.07, z + 0.02), (math.pi * 0.5, 0, 0), name=f"{name}_rim")
-    fall = mesh_cube((0.34, 0.08, 0.48), (x, y - 0.16, z - 0.16), name=f"{name}_fall")
+    bm = bmesh.new()
+    bm.from_mesh(cowl.data)
+    for v in bm.verts:
+        # Face opening: collapse the front instead of a boolean that shards the hem.
+        if v.co.y > y + 0.04:
+            pull = min(1.0, (v.co.y - (y + 0.04)) / 0.16)
+            v.co.y -= 0.16 * pull
+            v.co.x *= 1.0 - 0.35 * pull
+            v.co.z += 0.02 * pull
+        if v.co.y < y - 0.02:
+            v.co.y -= 0.04
+            v.co.z -= 0.05
+    bm.to_mesh(cowl.data)
+    bm.free()
+    cowl.data.update()
+    rim = mesh_torus(0.10, 0.018, (x, y + 0.05, z + 0.01), (math.pi * 0.5, 0, 0), name=f"{name}_rim")
+    fall = mesh_cube((0.36, 0.07, 0.52), (x, y - 0.18, z - 0.18), name=f"{name}_fall")
     hood = join([cowl, rim, fall], name)
-    return finish_cloth(hood, folds=6, amp=0.02, loc_z=z, depth=0.5)
+    return finish_cloth(hood, folds=6, amp=0.018, loc_z=z, depth=0.52)
 
 
 def make_sleeve(side: float, name: str) -> bpy.types.Object:
-    loc = (side * 0.24, 0.07, 1.16)
-    sleeve = mesh_cyl(0.072, 0.40, loc, (0.20, 0.0, side * 0.42), verts=18, name=name)
-    return finish_cloth(sleeve, folds=5, amp=0.014, loc_z=1.16, depth=0.40)
+    """Hanging draped sleeve from layered cloth cards — not a cone shard or capsule."""
+    hang = mesh_cube(
+        (0.20, 0.016, 0.38),
+        (side * 0.26, 0.10, 1.28),
+        (0.22, 0.0, side * 0.12),
+        name=f"{name}_hang",
+    )
+    fall = mesh_cube(
+        (0.17, 0.012, 0.42),
+        (side * 0.28, 0.07, 1.02),
+        (0.08, 0.0, side * 0.08),
+        name=f"{name}_fall",
+    )
+    lining = mesh_cube(
+        (0.14, 0.010, 0.34),
+        (side * 0.24, 0.04, 1.14),
+        (0.16, 0.0, side * 0.10),
+        name=f"{name}_lin",
+    )
+    cuff = mesh_cube(
+        (0.12, 0.008, 0.16),
+        (side * 0.30, 0.05, 0.82),
+        (0.05, 0.0, side * 0.18),
+        name=f"{name}_cuff",
+    )
+    sleeve = join([hang, fall, lining, cuff], name)
+    return finish_cloth(sleeve, folds=7, amp=0.018, loc_z=1.10, depth=0.70)
 
 
 def make_held_sword() -> list[bpy.types.Object]:
@@ -759,14 +844,20 @@ def make_held_staff() -> list[bpy.types.Object]:
 
 
 def make_held_club() -> list[bpy.types.Object]:
-    x, y, z = -0.42, 0.20, 0.48
-    shaft = mesh_cyl(0.038, 0.80, (x - 0.04, y + 0.04, z + 0.16), (0.9, 0.15, 0.08), verts=12, name="Club_shaft")
-    skin_finish(shaft, 0.003)
-    head = mesh_ico(0.11, (x - 0.12, y + 0.10, z + 0.52), "Club_head", 3)
-    head.scale = (1.2, 1.05, 0.85)
+    x, y, z = -0.40, 0.18, 0.50
+    rot = (0.85, 0.12, 0.06)
+    shaft = mesh_cyl(0.032, 0.78, (x - 0.02, y + 0.03, z + 0.14), rot, verts=12, name="Club_shaft")
+    grip = mesh_cyl(0.040, 0.16, (x + 0.01, y + 0.01, z - 0.08), rot, verts=10, name="Club_grip")
+    head = mesh_ico(0.11, (x - 0.14, y + 0.12, z + 0.50), "Club_head", 3)
+    head.scale = (1.25, 1.08, 0.88)
     apply_scale(head)
-    skin_finish(head, 0.005)
-    return [shaft, head]
+    spikes = []
+    for i, off in enumerate(((0.07, 0.02, 0.04), (-0.05, 0.04, 0.05), (0.02, -0.05, 0.06))):
+        sp = mesh_cone(0.022, 0.0, 0.07, (x - 0.14 + off[0], y + 0.12 + off[1], z + 0.56 + off[2]), name=f"Club_spike{i}", verts=6)
+        spikes.append(sp)
+    club = join([shaft, grip, head, *spikes], "Club_weapon")
+    skin_finish(club, 0.0025)
+    return [club]
 
 
 def armor_shell(size, loc, rot, name: str) -> bpy.types.Object:
@@ -776,15 +867,20 @@ def armor_shell(size, loc, rot, name: str) -> bpy.types.Object:
 
 
 def make_pauldron(side: float, name: str) -> bpy.types.Object:
-    x = side * 0.22
-    shell = mesh_uvsphere(0.12, (x, 0.07, 1.50), name, 22, 14)
-    shell.scale = (1.42, 1.12, 0.74)
-    apply_scale(shell)
-    cutter = mesh_cube((0.34, 0.30, 0.14), (x, 0.07, 1.39), name="cut_pauldron")
-    boolean_diff(shell, cutter)
-    rim = mesh_torus(0.09, 0.014, (x, 0.07, 1.46), (0.18, 0.0, side * 0.18), name=f"{name}_rim")
-    ridge = mesh_cube((0.045, 0.12, 0.07), (x, 0.02, 1.57), name=f"{name}_ridge")
-    obj = join([shell, rim, ridge], name)
+    """Layered lames wrapping the deltoid — overlapping plates, not a bowl or disc."""
+    x = side * 0.20
+    plates = []
+    specs = [
+        ((0.28, 0.16, 0.055), (x, 0.06, 1.52), (0.22, 0.0, side * 0.35), f"{name}_cap"),
+        ((0.26, 0.15, 0.048), (x + side * 0.04, 0.02, 1.44), (0.48, 0.0, side * 0.42), f"{name}_mid"),
+        ((0.22, 0.13, 0.042), (x + side * 0.07, -0.01, 1.36), (0.72, 0.0, side * 0.46), f"{name}_low"),
+        ((0.18, 0.11, 0.036), (x + side * 0.09, -0.03, 1.28), (0.95, 0.0, side * 0.40), f"{name}_skirt"),
+        ((0.04, 0.18, 0.07), (x + side * 0.02, 0.04, 1.54), (0.15, 0.0, side * 0.12), f"{name}_ridge"),
+        ((0.08, 0.05, 0.10), (x + side * 0.10, 0.08, 1.48), (0.35, 0.0, side * 0.55), f"{name}_spauld"),
+    ]
+    for size, loc, rot, pname in specs:
+        plates.append(mesh_cube(size, loc, rot, name=pname))
+    obj = join(plates, name)
     shade_smooth(obj)
     triangulate(obj)
     unwrap(obj)
@@ -833,8 +929,9 @@ def add_warrior_kit(groups: dict[str, list[bpy.types.Object]]) -> None:
 
 
 def add_lich_kit(groups: dict[str, list[bpy.types.Object]]) -> None:
-    groups["Hips"].append(make_robe("Robe_skirt", 0.55, 0.42, 0.12, 1.10, folds=9))
-    groups["Hips"] += make_tatters(0.18)
+    groups["Hips"].append(make_robe("Robe_under", 0.48, 0.38, 0.11, 1.18, folds=7))
+    groups["Hips"].append(make_robe("Robe_skirt", 0.58, 0.44, 0.13, 1.08, folds=9))
+    groups["Hips"] += make_cloth_cards(0.14, "Cloth_fringe")
     groups["Neck"].append(make_hood((0, 0.04, 1.58), "Robe_cowl"))
     groups["LeftArm"].append(make_sleeve(1.0, "Robe_sleeveL"))
     groups["RightArm"].append(make_sleeve(-1.0, "Robe_sleeveR"))
@@ -850,8 +947,9 @@ def add_lich_kit(groups: dict[str, list[bpy.types.Object]]) -> None:
 
 
 def add_wraith_kit(groups: dict[str, list[bpy.types.Object]]) -> None:
-    groups["Hips"].append(make_robe("Robe_body", 0.68, 0.48, 0.10, 1.32, folds=10))
-    groups["Hips"] += make_tatters(0.14)
+    groups["Hips"].append(make_robe("Robe_under", 0.60, 0.42, 0.10, 1.38, folds=8))
+    groups["Hips"].append(make_robe("Robe_body", 0.70, 0.50, 0.12, 1.28, folds=10))
+    groups["Hips"] += make_cloth_cards(0.12, "Cloth_fringe")
     groups["Head"].append(make_hood((0, 0.03, 1.58), "Hood_cowl"))
     groups["LeftArm"].append(make_sleeve(1.0, "Robe_sleeveL"))
     groups["RightArm"].append(make_sleeve(-1.0, "Robe_sleeveR"))
@@ -864,104 +962,145 @@ def _skin_chunk(r: float, loc, name: str, scale=None, voxel: float = 0.014) -> b
     if scale:
         obj.scale = scale
         apply_scale(obj)
-    return skin_finish(obj, 0.0035)
+    return obj
 
 
 def _skin_limb(r: float, length: float, loc, rot, name: str) -> bpy.types.Object:
-    shaft = mesh_cyl(r, length, loc, rot, verts=16, name=name)
-    return skin_finish(shaft, 0.003)
+    shaft = mesh_cyl(r, length, loc, rot, verts=18, name=name)
+    orient = Euler(rot, "XYZ").to_matrix()
+    center = Vector(loc)
+    half = orient @ Vector((0.0, 0.0, length * 0.48))
+    cap_a = mesh_ico(r * 1.18, tuple(center + half), name + "_a", 2)
+    cap_b = mesh_ico(r * 1.08, tuple(center - half), name + "_b", 2)
+    return join([shaft, cap_a, cap_b], name)
 
 
-def _skin_box(size, loc, name: str, rot=(0, 0, 0)) -> bpy.types.Object:
-    obj = mesh_cube(size, loc, rot, name=name)
-    subdivide(obj, 1)
-    return skin_finish(obj, 0.0038)
+def fuse_skin(parts: list, name: str, voxel: float = 0.016, collapse: float = 0.48) -> bpy.types.Object:
+    """Join overlapping chunks. Skip voxel remesh — it melts snouts and limbs into spheres."""
+    obj = join(parts, name)
+    shade_smooth(obj)
+    displace(obj, 0.0028, 0.12)
+    triangulate(obj)
+    unwrap(obj)
+    obj.name = name
+    if obj.data:
+        obj.data.name = name[:60]
+    return obj
+
+
+def sculpt_troll_head() -> bpy.types.Object:
+    cranium = mesh_uvsphere(0.16, (0.0, 0.20, 1.58), "Skin_cranium", 28, 18)
+    cranium.scale = (1.12, 1.05, 1.08)
+    apply_scale(cranium)
+    snout = mesh_uvsphere(0.11, (0.0, 0.42, 1.38), "Skin_snout", 24, 16)
+    snout.scale = (0.72, 1.55, 0.70)
+    apply_scale(snout)
+    jaw = mesh_ico(0.09, (0.0, 0.34, 1.30), "Skin_jaw", 2)
+    jaw.scale = (1.15, 1.35, 0.70)
+    apply_scale(jaw)
+    brow = mesh_cube((0.22, 0.07, 0.06), (0.0, 0.34, 1.54), (0.35, 0, 0), name="Skin_brow")
+    obj = join([cranium, snout, jaw, brow], "Skin_head")
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    for v in bm.verts:
+        x, y, z = v.co.x, v.co.y, v.co.z
+        # Eye sockets.
+        if abs(x) > 0.03 and 0.28 < y < 0.40 and 1.44 < z < 1.56:
+            v.co.y -= 0.03
+            v.co.z -= 0.02
+        # Flatten the occiput so the back is a skull, not a ball.
+        if y < 0.08 and z > 1.48:
+            v.co.y += 0.03
+            v.co.z *= 0.98
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    return obj
 
 
 def make_troll_hand(side: float) -> list[bpy.types.Object]:
-    x, y, z = (side * 0.40, 0.18, 0.46)
+    x, y, z = (side * 0.42, 0.16, 0.44)
     tag = "L" if side > 0 else "R"
-    palm = mesh_cube((0.10, 0.045, 0.12), (x, y, z), name=f"Skin_palm{tag}")
+    palm = mesh_ico(0.055, (x, y, z), f"Skin_palm{tag}", 2)
+    palm.scale = (1.15, 0.72, 1.25)
+    apply_scale(palm)
     parts = [palm]
-    for i, ox in enumerate((-0.036, -0.012, 0.012, 0.034)):
-        knuck = mesh_ico(0.018, (x + side * ox, y + 0.012, z - 0.055), f"Skin_knuck{tag}{i}", 2)
-        finger = mesh_cyl(0.012, 0.085, (x + side * ox, y + 0.028, z - 0.12), (0.45, 0, 0), verts=8, name=f"Skin_finger{tag}{i}")
-        tip = mesh_ico(0.011, (x + side * ox, y + 0.055, z - 0.165), f"Skin_fingertip{tag}{i}", 1)
+    for i, ox in enumerate((-0.038, -0.012, 0.012, 0.036)):
+        knuck = mesh_ico(0.016, (x + side * ox, y + 0.01, z - 0.05), f"Skin_knuck{tag}{i}", 2)
+        finger = mesh_cyl(0.013, 0.09, (x + side * ox, y + 0.03, z - 0.12), (0.55, 0, 0), verts=8, name=f"Skin_finger{tag}{i}")
+        tip = mesh_ico(0.011, (x + side * ox, y + 0.06, z - 0.17), f"Skin_fingertip{tag}{i}", 1)
         parts += [knuck, finger, tip]
-    thumb = mesh_cyl(0.014, 0.06, (x + side * 0.05, y + 0.04, z - 0.02), (0.8, side * 0.75, 0.15), verts=8, name=f"Skin_thumb{tag}")
+    thumb = mesh_cyl(0.015, 0.07, (x + side * 0.05, y + 0.04, z - 0.01), (0.85, side * 0.7, 0.12), verts=8, name=f"Skin_thumb{tag}")
     parts.append(thumb)
     hand = join(parts, f"Skin_hand{tag}")
-    return [skin_finish(hand, 0.002)]
+    return [skin_finish(hand, 0.0018)]
 
 
 def make_troll_foot(side: float) -> list[bpy.types.Object]:
-    x, y, z = (side * 0.17, 0.08, 0.05)
+    x, y, z = (side * 0.18, 0.10, 0.05)
     tag = "L" if side > 0 else "R"
-    ankle = mesh_cyl(0.05, 0.08, (x, y - 0.01, z + 0.08), verts=12, name=f"Skin_ankle{tag}")
-    heel = mesh_ico(0.042, (x, y - 0.03, z + 0.02), f"Skin_heel{tag}", 2)
-    arch = mesh_cube((0.09, 0.16, 0.045), (x, y + 0.06, z + 0.02), name=f"Skin_arch{tag}")
+    ankle = mesh_cyl(0.048, 0.09, (x, y - 0.02, z + 0.08), verts=12, name=f"Skin_ankle{tag}")
+    heel = mesh_ico(0.045, (x, y - 0.04, z + 0.02), f"Skin_heel{tag}", 2)
+    arch = mesh_ico(0.05, (x, y + 0.05, z + 0.02), f"Skin_arch{tag}", 2)
+    arch.scale = (1.1, 1.6, 0.55)
+    apply_scale(arch)
     toes = []
-    for i, ox in enumerate((-0.03, -0.01, 0.01, 0.03)):
-        toes.append(mesh_cyl(0.013, 0.06, (x + ox, y + 0.15, z + 0.016), (math.pi * 0.5, 0, 0), verts=8, name=f"Skin_toe{tag}{i}"))
-        toes.append(mesh_ico(0.012, (x + ox, y + 0.19, z + 0.014), f"Skin_toetip{tag}{i}", 1))
+    for i, ox in enumerate((-0.032, -0.010, 0.010, 0.032)):
+        toes.append(mesh_cyl(0.012, 0.055, (x + ox, y + 0.16, z + 0.014), (math.pi * 0.5, 0, 0), verts=8, name=f"Skin_toe{tag}{i}"))
+        toes.append(mesh_ico(0.011, (x + ox, y + 0.20, z + 0.012), f"Skin_toetip{tag}{i}", 1))
     foot = join([ankle, heel, arch, *toes], f"Skin_foot{tag}")
-    return [skin_finish(foot, 0.002)]
+    return [skin_finish(foot, 0.0018)]
 
 
 def make_loincloth() -> bpy.types.Object:
-    belt = mesh_cube((0.46, 0.08, 0.07), (0, 0.08, 0.82), name="Loin_belt")
-    front = mesh_cube((0.28, 0.06, 0.42), (0, 0.16, 0.56), name="Loin_front")
-    cloth = join([belt, front], "Loin_cloth")
-    return finish_cloth(cloth, folds=5, amp=0.028, loc_z=0.56, depth=0.42)
+    belt = mesh_cube((0.48, 0.08, 0.07), (0, 0.10, 0.82), name="Loin_belt")
+    front = mesh_cube((0.26, 0.05, 0.46), (0, 0.18, 0.54), name="Loin_front")
+    side_l = mesh_cube((0.08, 0.04, 0.28), (0.16, 0.12, 0.58), (0.1, 0.2, 0.15), name="Loin_sideL")
+    side_r = mesh_cube((0.08, 0.04, 0.28), (-0.16, 0.12, 0.58), (0.1, -0.2, -0.15), name="Loin_sideR")
+    cloth = join([belt, front, side_l, side_r], "Loin_cloth")
+    return finish_cloth(cloth, folds=5, amp=0.024, loc_z=0.56, depth=0.46)
 
 
 def add_troll_kit(groups: dict[str, list[bpy.types.Object]]) -> None:
-    cranium = mesh_uvsphere(0.11, (0, 0.18, 1.58), "Skin_head", 24, 14)
-    cranium.scale = (1.05, 0.92, 1.08)
-    apply_scale(cranium)
-    brow = mesh_cube((0.22, 0.08, 0.07), (0, 0.36, 1.62), name="Skin_brow")
-    snout = mesh_uvsphere(0.10, (0, 0.46, 1.40), "Skin_snout", 18, 12)
-    snout.scale = (0.78, 1.55, 0.72)
-    apply_scale(snout)
-    jaw = mesh_cube((0.15, 0.16, 0.09), (0, 0.44, 1.30), name="Skin_jaw")
-    ear_l = mesh_cone(0.034, 0.0, 0.10, (0.13, 0.14, 1.64), (0.95, 0.55, 0.15), name="Skin_earL", verts=8)
-    ear_r = mesh_cone(0.034, 0.0, 0.10, (-0.13, 0.14, 1.64), (0.95, -0.55, -0.15), name="Skin_earR", verts=8)
-    for part in (cranium, brow, snout, jaw, ear_l, ear_r):
-        skin_finish(part, 0.0025)
-    groups["Head"] += [cranium, brow, snout, jaw, ear_l, ear_r]
-    groups["Head"].append(mesh_cone(0.024, 0.0, 0.16, (0.055, 0.56, 1.28), (1.45, 0.12, 0), name="Bone_tuskL", verts=8))
-    groups["Head"].append(mesh_cone(0.024, 0.0, 0.16, (-0.055, 0.56, 1.28), (1.45, -0.12, 0), name="Bone_tuskR", verts=8))
-    groups["Head"].append(mesh_uvsphere(0.02, (0.05, 0.38, 1.54), "Eye_L", 10, 7))
-    groups["Head"].append(mesh_uvsphere(0.02, (-0.05, 0.38, 1.54), "Eye_R", 10, 7))
-    groups["Spine2"] += [
-        _skin_box((0.56, 0.34, 0.40), (0, 0.20, 1.28), "Skin_chest", (0.28, 0, 0)),
-        _skin_chunk(0.09, (0.14, 0.28, 1.26), "Skin_pecL", (1.3, 0.7, 0.75)),
-        _skin_chunk(0.09, (-0.14, 0.28, 1.26), "Skin_pecR", (1.3, 0.7, 0.75)),
+    head = sculpt_troll_head()
+    ear_l = mesh_cone(0.032, 0.004, 0.14, (0.18, 0.16, 1.64), (1.15, 0.65, 0.25), name="Skin_earL", verts=8)
+    ear_r = mesh_cone(0.032, 0.004, 0.14, (-0.18, 0.16, 1.64), (1.15, -0.65, -0.25), name="Skin_earR", verts=8)
+    groups["Head"].append(fuse_skin([head, ear_l, ear_r], "Skin_head"))
+    groups["Head"].append(mesh_cone(0.028, 0.0, 0.20, (0.05, 0.58, 1.28), (1.45, 0.12, 0), name="Bone_tuskL", verts=8))
+    groups["Head"].append(mesh_cone(0.028, 0.0, 0.20, (-0.05, 0.58, 1.28), (1.45, -0.12, 0), name="Bone_tuskR", verts=8))
+    groups["Head"].append(mesh_uvsphere(0.020, (0.05, 0.38, 1.48), "Eye_L", 10, 7))
+    groups["Head"].append(mesh_uvsphere(0.020, (-0.05, 0.38, 1.48), "Eye_R", 10, 7))
+
+    torso_parts = [
+        _skin_chunk(0.22, (0.0, 0.16, 1.18), "Skin_chest", (1.45, 0.95, 1.05)),
+        _skin_chunk(0.13, (0.16, 0.24, 1.20), "Skin_pecL", (1.25, 0.80, 0.75)),
+        _skin_chunk(0.13, (-0.16, 0.24, 1.20), "Skin_pecR", (1.25, 0.80, 0.75)),
+        _skin_chunk(0.19, (0.0, 0.12, 0.96), "Skin_belly", (1.20, 1.00, 1.05)),
+        _skin_chunk(0.17, (0.0, 0.08, 0.78), "Skin_hips", (1.28, 0.95, 0.82)),
+        _skin_limb(0.07, 0.22, (0.0, 0.24, 1.42), (1.05, 0, 0), "Skin_neck"),
+        _skin_chunk(0.11, (0.0, -0.02, 1.16), "Skin_back", (1.45, 0.65, 1.10)),
     ]
-    groups["Spine"].append(_skin_box((0.46, 0.30, 0.34), (0, 0.12, 1.02), "Skin_belly", (0.12, 0, 0)))
-    groups["Hips"].append(_skin_box((0.44, 0.26, 0.22), (0, 0.06, 0.80), "Skin_hips"))
+    groups["Spine2"].append(fuse_skin(torso_parts, "Skin_torso"))
     groups["Hips"].append(make_loincloth())
-    groups["LeftShoulder"].append(_skin_chunk(0.11, (0.30, 0.16, 1.36), "Skin_shoulderL", (1.15, 1.0, 1.05)))
-    groups["RightShoulder"].append(_skin_chunk(0.11, (-0.30, 0.16, 1.36), "Skin_shoulderR", (1.15, 1.0, 1.05)))
-    groups["LeftArm"].append(_skin_limb(0.07, 0.42, (0.34, 0.16, 1.12), (0.18, 0.0, 0.12), "Skin_uarmL"))
-    groups["LeftForeArm"].append(_skin_limb(0.058, 0.40, (0.38, 0.18, 0.74), (0.16, 0.0, 0.08), "Skin_farmL"))
-    groups["RightArm"].append(_skin_limb(0.07, 0.42, (-0.34, 0.16, 1.12), (0.18, 0.0, -0.12), "Skin_uarmR"))
-    groups["RightForeArm"].append(_skin_limb(0.058, 0.40, (-0.38, 0.18, 0.74), (0.16, 0.0, -0.08), "Skin_farmR"))
+
+    groups["LeftShoulder"].append(skin_finish(_skin_chunk(0.12, (0.30, 0.16, 1.34), "Skin_shoulderL", (1.2, 1.05, 1.1)), 0.002))
+    groups["RightShoulder"].append(skin_finish(_skin_chunk(0.12, (-0.30, 0.16, 1.34), "Skin_shoulderR", (1.2, 1.05, 1.1)), 0.002))
+    groups["LeftArm"].append(skin_finish(_skin_limb(0.075, 0.44, (0.36, 0.16, 1.10), (0.22, 0.0, 0.10), "Skin_uarmL"), 0.002))
+    groups["LeftForeArm"].append(skin_finish(_skin_limb(0.060, 0.40, (0.40, 0.17, 0.72), (0.18, 0.0, 0.08), "Skin_farmL"), 0.002))
+    groups["RightArm"].append(skin_finish(_skin_limb(0.075, 0.44, (-0.36, 0.16, 1.10), (0.22, 0.0, -0.10), "Skin_uarmR"), 0.002))
+    groups["RightForeArm"].append(skin_finish(_skin_limb(0.060, 0.40, (-0.40, 0.17, 0.72), (0.18, 0.0, -0.08), "Skin_farmR"), 0.002))
     groups["LeftHand"] += make_troll_hand(1.0)
     groups["RightHand"] += make_troll_hand(-1.0)
-    groups["LeftUpLeg"].append(_skin_limb(0.085, 0.40, (0.16, 0.07, 0.58), (0.08, 0, 0), "Skin_thighL"))
-    groups["LeftLeg"].append(_skin_limb(0.065, 0.36, (0.16, 0.08, 0.24), (0.05, 0, 0), "Skin_calfL"))
-    groups["RightUpLeg"].append(_skin_limb(0.085, 0.40, (-0.16, 0.07, 0.58), (0.08, 0, 0), "Skin_thighR"))
-    groups["RightLeg"].append(_skin_limb(0.065, 0.36, (-0.16, 0.08, 0.24), (0.05, 0, 0), "Skin_calfR"))
+    groups["LeftUpLeg"].append(skin_finish(_skin_limb(0.090, 0.42, (0.17, 0.07, 0.58), (0.10, 0, 0), "Skin_thighL"), 0.002))
+    groups["LeftLeg"].append(skin_finish(_skin_limb(0.068, 0.36, (0.17, 0.08, 0.24), (0.06, 0, 0), "Skin_calfL"), 0.002))
+    groups["RightUpLeg"].append(skin_finish(_skin_limb(0.090, 0.42, (-0.17, 0.07, 0.58), (0.10, 0, 0), "Skin_thighR"), 0.002))
+    groups["RightLeg"].append(skin_finish(_skin_limb(0.068, 0.36, (-0.17, 0.08, 0.24), (0.06, 0, 0), "Skin_calfR"), 0.002))
     groups["LeftFoot"] += make_troll_foot(1.0)
     groups["RightFoot"] += make_troll_foot(-1.0)
-    for i, loc in enumerate(((0.12, 0.30, 1.18), (-0.10, 0.14, 0.94), (0.16, 0.08, 1.22), (-0.14, 0.10, 0.72))):
-        wart = mesh_ico(0.022, loc, f"Wart_{i}", 2)
-        skin_finish(wart, 0.004)
-        groups["Spine2" if i < 2 else "Spine"].append(wart)
-    scar = mesh_cube((0.14, 0.01, 0.035), (0.08, 0.34, 1.22), (0.15, 0.35, 0.08), name="Scar_chest")
-    groups["Spine2"].append(scar)
-    groups["Spine2"].append(_skin_chunk(0.10, (0.0, -0.08, 1.22), "Stone_back"))
+    for i, loc in enumerate(((0.12, 0.24, 1.16), (-0.10, 0.16, 0.96), (0.16, 0.14, 1.20))):
+        wart = mesh_ico(0.02, loc, f"Wart_{i}", 2)
+        skin_finish(wart, 0.003)
+        groups["Spine2"].append(wart)
     groups["RightHand"] += make_held_club()
 
 
@@ -992,10 +1131,12 @@ def troll_bones() -> list:
 
 def make_humanoid(kind: str) -> None:
     reset()
+    bpy.context.scene.frame_end = 32
     if kind == "cave_troll":
         bones = troll_bones()
         groups: dict[str, list[bpy.types.Object]] = {b[0]: [] for b in bones}
         add_troll_kit(groups)
+        locations = death_locations(0.80, 0.22)
     else:
         bones = humanoid_bones()
         groups = build_skeleton_parts()
@@ -1005,9 +1146,11 @@ def make_humanoid(kind: str) -> None:
             add_lich_kit(groups)
         elif kind == "wraith":
             add_wraith_kit(groups)
-    arm = add_armature(bones, humanoid_actions(), humanoid_locations())
+        locations = death_locations(0.90, 0.22)
+    arm = add_armature(bones, humanoid_actions(), locations)
     arm.name = kind
     skin_groups(arm, groups)
+    # glTF Y-up maps Blender +Y (snout) onto Godot -Z, matching look_at.
     finalize_skinned(arm)
     export_glb(arm, f"monsters/{kind}.glb")
 
@@ -1046,26 +1189,171 @@ def _rename_action(act: bpy.types.Action, name: str) -> None:
 
 
 def _canine_silhouette(wolf: bpy.types.Object) -> None:
-    """Push the Quaternius wolf toward a canine read: ruff, taller ears, less horse-neck."""
+    """Push the Quaternius wolf toward a canine read: snout, ruff, pricked ears, tucked waist."""
     if wolf.type != "MESH":
         return
     bm = bmesh.new()
     bm.from_mesh(wolf.data)
+    bm.normal_update()
+    xs = [v.co.x for v in bm.verts]
+    ys = [v.co.y for v in bm.verts]
+    zs = [v.co.z for v in bm.verts]
+    x0, x1 = min(xs), max(xs)
+    y0, y1 = min(ys), max(ys)
+    z0, z1 = min(zs), max(zs)
+    height = max(0.05, z1 - z0)
+    length = max(0.05, y1 - y0)
+    for v in bm.verts:
+        h = (v.co.z - z0) / height
+        along = (v.co.y - y0) / length
+        radial = math.hypot(v.co.x, v.co.y)
+        # Deeper chest / ruff.
+        if 0.38 < h < 0.70 and radial > 0.08:
+            v.co += v.normal * (0.028 * math.sin((h - 0.38) * math.pi))
+        # Longer snout (front of the head).
+        if h > 0.62 and along > 0.62:
+            v.co.y += 0.055 * ((along - 0.62) / 0.38)
+            v.co.z -= 0.018 * ((along - 0.62) / 0.38)
+            v.co.x *= 0.86
+        # Pricked ears.
+        if h > 0.82 and abs(v.co.x) > 0.03:
+            v.co.z += 0.045
+            v.co.x *= 1.16
+            v.co.y -= 0.01
+        # Tuck the waist, thicken the tail end.
+        if 0.28 < h < 0.48 and along < 0.45:
+            v.co.x *= 0.90
+        if along < 0.18 and h < 0.55:
+            v.co += v.normal * 0.022
+        # Slightly thinner legs.
+        if h < 0.28 and abs(v.co.x) > 0.04:
+            v.co.x *= 0.92
+    bm.to_mesh(wolf.data)
+    bm.free()
+    wolf.data.update()
+
+
+def _copy_weights(src: bpy.types.Object, dst: bpy.types.Object) -> None:
+    dst.vertex_groups.clear()
+    for vg in src.vertex_groups:
+        dst.vertex_groups.new(name=vg.name)
+    for vi, vert in enumerate(src.data.vertices):
+        for g in vert.groups:
+            if g.group < len(dst.vertex_groups):
+                dst.vertex_groups[g.group].add([vi], g.weight, "REPLACE")
+    arm_obj = None
+    for mod in src.modifiers:
+        if mod.type == "ARMATURE":
+            arm_obj = mod.object
+            break
+    if arm_obj is not None:
+        mod = dst.modifiers.new(name="Armature", type="ARMATURE")
+        mod.object = arm_obj
+        mod.use_vertex_groups = True
+    dst.parent = src.parent
+    dst.parent_type = src.parent_type
+
+
+def add_fur_shell(wolf: bpy.types.Object) -> bpy.types.Object:
+    shell = wolf.copy()
+    shell.data = wolf.data.copy()
+    shell.name = "Fur_shell"
+    if shell.data:
+        shell.data.name = "Fur_shell"
+    bpy.context.collection.objects.link(shell)
+    bm = bmesh.new()
+    bm.from_mesh(shell.data)
     bm.normal_update()
     zs = [v.co.z for v in bm.verts]
     z0, z1 = min(zs), max(zs)
     height = max(0.05, z1 - z0)
     for v in bm.verts:
         h = (v.co.z - z0) / height
-        radial = math.hypot(v.co.x, v.co.y)
-        if 0.42 < h < 0.68 and radial > 0.10:
-            v.co += v.normal * (0.016 * math.sin((h - 0.42) * math.pi))
-        if h > 0.84 and abs(v.co.x) > 0.035:
-            v.co.z += 0.022
-            v.co.x *= 1.08
-    bm.to_mesh(wolf.data)
+        dist = 0.018 + 0.028 * (0.25 + 0.75 * h)
+        v.co += v.normal * dist
+    bm.to_mesh(shell.data)
     bm.free()
-    wolf.data.update()
+    shell.data.update()
+    _copy_weights(wolf, shell)
+    shade_smooth(shell)
+    return shell
+
+
+def add_fur_cards(arm: bpy.types.Object, wolf: bpy.types.Object) -> None:
+    mins, maxs = evaluated_aabb(wolf)
+    mid_z = (mins.z + maxs.z) * 0.58
+    neck_y = mins.y * 0.12 + maxs.y * 0.88
+    chest_y = mins.y * 0.40 + maxs.y * 0.60
+    bone = "Body"
+    for name in ("Torso", "Torso2", "Neck1", "Body", "Hips", "Spine"):
+        if arm.pose.bones.get(name) is not None:
+            bone = name
+            break
+    for i in range(14):
+        ang = (i / 14.0) * math.tau
+        along = neck_y if i % 2 == 0 else chest_y
+        x = math.cos(ang) * (0.13 if i % 2 == 0 else 0.16)
+        y = along + math.sin(ang) * 0.05
+        card = mesh_cube(
+            (0.07, 0.004, 0.16),
+            (x, y, mid_z + (0.06 if i % 2 == 0 else 0.0)),
+            (0.55, 0.0, ang),
+            name=f"Fur_card{i}",
+        )
+        if card.data:
+            card.data.name = f"Fur_card{i}"
+        triangulate(card)
+        unwrap(card)
+        bind_mesh(card, arm, bone)
+    ruff = mesh_cube((0.22, 0.004, 0.18), (0.0, neck_y + 0.02, mid_z + 0.10), (0.85, 0, 0), name="Fur_cardRuff")
+    if ruff.data:
+        ruff.data.name = "Fur_cardRuff"
+    triangulate(ruff)
+    unwrap(ruff)
+    bind_mesh(ruff, arm, bone)
+    tail = mesh_cube((0.08, 0.004, 0.22), (0.0, mins.y + 0.06, mins.z + 0.28), (0.9, 0, 0), name="Fur_cardTail")
+    if tail.data:
+        tail.data.name = "Fur_cardTail"
+    triangulate(tail)
+    unwrap(tail)
+    bind_mesh(tail, arm, bone)
+
+
+def _plant_wolf_death(arm: bpy.types.Object) -> None:
+    """If the Quaternius death clip leaves the mesh in the air, drop Hips to the floor."""
+    act = bpy.data.actions.get("death")
+    if act is None:
+        return
+    wolf = next((o for o in arm.children_recursive if o.type == "MESH" and "Fur_body" in o.name), None)
+    if wolf is None:
+        return
+    scene = bpy.context.scene
+    end = int(act.frame_range[1]) if act.frame_range else 24
+    arm.animation_data.action = act
+    scene.frame_set(end)
+    bpy.context.view_layer.update()
+    mins, maxs = evaluated_aabb(wolf)
+    print("wolf_death_aabb", round(mins.z, 3), round(maxs.z, 3), "bones", [b.name for b in arm.pose.bones][:12])
+    if mins.z <= 0.22:
+        arm.animation_data.action = None
+        scene.frame_set(1)
+        return
+    bone = None
+    for name in ("Hips", "Root", "root", "spine", "Spine", "Body"):
+        if arm.pose.bones.get(name) is not None:
+            bone = name
+            break
+    if bone is None and arm.pose.bones:
+        bone = arm.pose.bones[0].name
+    drop = 0.08 - mins.z
+    pb = arm.pose.bones[bone]
+    pb.rotation_mode = "XYZ"
+    for frame, t in ((1, 0.0), (max(2, end // 2), 0.5), (end, 1.0)):
+        scene.frame_set(frame)
+        pb.location = Vector((0.0, 0.0, drop * t))
+        pb.keyframe_insert(data_path="location", frame=frame)
+    arm.animation_data.action = None
+    scene.frame_set(1)
 
 
 def process_wolf() -> None:
@@ -1136,6 +1424,9 @@ def process_wolf() -> None:
     arm.scale = (1.0, 1.0, 1.0)
     wolf.scale = (1.0, 1.0, 1.0)
     _canine_silhouette(wolf)
+    add_fur_shell(wolf)
+    add_fur_cards(arm, wolf)
+    _plant_wolf_death(arm)
     mins, maxs = evaluated_aabb(wolf)
     if mins.z < -0.02 or mins.z > 0.08:
         arm.location.z -= mins.z

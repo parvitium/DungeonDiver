@@ -147,6 +147,115 @@ static func flagstones(size: Vector3, tile: float, seed_value: int) -> ArrayMesh
 	return mesh
 
 
+static func uneven_slab(size: Vector3, tile: float, seed_value: int) -> ArrayMesh:
+	## Continuous floor: grout lives in the height/normal maps, not as floating tiles.
+	var key := "slab:%.2f:%.2f:%.2f:%.3f:%d" % [size.x, size.y, size.z, tile, seed_value]
+	if _cache.has(key):
+		return _cache[key]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value if seed_value != 0 else 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cols := maxi(6, int(size.x / 1.4))
+	var rows := maxi(6, int(size.z / 1.4))
+	var hx := size.x * 0.5
+	var hz := size.z * 0.5
+	var hy := size.y * 0.5
+	var heights: Array = []
+	for iz in rows + 1:
+		var row: PackedFloat32Array = PackedFloat32Array()
+		for ix in cols + 1:
+			row.append(rng.randf_range(0.0, 0.016))
+		heights.append(row)
+	for iz in rows:
+		for ix in cols:
+			var u0 := float(ix) / float(cols)
+			var v0 := float(iz) / float(rows)
+			var u1 := float(ix + 1) / float(cols)
+			var v1 := float(iz + 1) / float(rows)
+			var x0 := (u0 - 0.5) * size.x
+			var x1 := (u1 - 0.5) * size.x
+			var z0 := (v0 - 0.5) * size.z
+			var z1 := (v1 - 0.5) * size.z
+			var a := Vector3(x0, hy + heights[iz][ix], z0)
+			var b := Vector3(x1, hy + heights[iz][ix + 1], z0)
+			var c := Vector3(x1, hy + heights[iz + 1][ix + 1], z1)
+			var d := Vector3(x0, hy + heights[iz + 1][ix], z1)
+			var nrm := (b - a).cross(d - a).normalized()
+			if nrm.y < 0.0:
+				nrm = -nrm
+			var uw := size.x / maxf(0.05, tile) / float(cols)
+			var uh := size.z / maxf(0.05, tile) / float(rows)
+			_tri(st, a, b, c, nrm, nrm, nrm, Vector2(u0 * uw * float(cols), v0 * uh * float(rows)), Vector2(u1 * uw * float(cols), v0 * uh * float(rows)), Vector2(u1 * uw * float(cols), v1 * uh * float(rows)))
+			_tri(st, a, c, d, nrm, nrm, nrm, Vector2(u0 * uw * float(cols), v0 * uh * float(rows)), Vector2(u1 * uw * float(cols), v1 * uh * float(rows)), Vector2(u0 * uw * float(cols), v1 * uh * float(rows)))
+	# Sides so the slab has thickness against the walls.
+	_quad(st, Vector3(-hx, -hy, hz), Vector3(hx, -hy, hz), Vector3(hx, hy, hz), Vector3(-hx, hy, hz), Vector3.BACK, size.x, size.y, tile)
+	_quad(st, Vector3(hx, -hy, -hz), Vector3(-hx, -hy, -hz), Vector3(-hx, hy, -hz), Vector3(hx, hy, -hz), Vector3.FORWARD, size.x, size.y, tile)
+	_quad(st, Vector3(hx, -hy, hz), Vector3(hx, -hy, -hz), Vector3(hx, hy, -hz), Vector3(hx, hy, hz), Vector3.RIGHT, size.z, size.y, tile)
+	_quad(st, Vector3(-hx, -hy, -hz), Vector3(-hx, -hy, hz), Vector3(-hx, hy, hz), Vector3(-hx, hy, -hz), Vector3.LEFT, size.z, size.y, tile)
+	_quad(st, Vector3(-hx, -hy, -hz), Vector3(hx, -hy, -hz), Vector3(hx, -hy, hz), Vector3(-hx, -hy, hz), Vector3.DOWN, size.x, size.z, tile)
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+static func irregular_wall(size: Vector3, tile: float, seed_value: int) -> ArrayMesh:
+	var key := "iwall:%.2f:%.2f:%.2f:%.3f:%d" % [size.x, size.y, size.z, tile, seed_value]
+	if _cache.has(key):
+		return _cache[key]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value if seed_value != 0 else 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hx := size.x * 0.5
+	var hy := size.y * 0.5
+	var hz := size.z * 0.5
+	var axis_x := size.x >= size.z
+	var length := size.x if axis_x else size.z
+	var cols := maxi(5, int(length / 1.15))
+	var rows := maxi(4, int(size.y / 0.85))
+	for iz in rows:
+		for ix in cols:
+			var u0 := float(ix) / float(cols)
+			var u1 := float(ix + 1) / float(cols)
+			var v0 := float(iz) / float(rows)
+			var v1 := float(iz + 1) / float(rows)
+			var jitter := rng.randf_range(-0.045, 0.07)
+			var inset0 := rng.randf_range(-0.03, 0.05)
+			var inset1 := rng.randf_range(-0.03, 0.05)
+			var y0 := (v0 - 0.5) * size.y + rng.randf_range(-0.04, 0.04)
+			var y1 := (v1 - 0.5) * size.y + rng.randf_range(-0.04, 0.04)
+			if axis_x:
+				var x0 := (u0 - 0.5) * size.x
+				var x1 := (u1 - 0.5) * size.x
+				var z_out := hz
+				var z_in := -hz + jitter
+				var a := Vector3(x0, y0, z_in + inset0)
+				var b := Vector3(x1, y0, z_in + inset1)
+				var c := Vector3(x1, y1, z_in + inset1)
+				var d := Vector3(x0, y1, z_in + inset0)
+				var nrm := (b - a).cross(d - a).normalized()
+				_quad(st, a, b, c, d, nrm, (x1 - x0), (y1 - y0), tile)
+				_quad(st, Vector3(x0, y0, z_out), Vector3(x0, y1, z_out), Vector3(x1, y1, z_out), Vector3(x1, y0, z_out), Vector3.BACK, (x1 - x0), (y1 - y0), tile)
+			else:
+				var z0 := (u0 - 0.5) * size.z
+				var z1 := (u1 - 0.5) * size.z
+				var x_in := -hx + jitter
+				var a := Vector3(x_in + inset0, y0, z0)
+				var b := Vector3(x_in + inset1, y0, z1)
+				var c := Vector3(x_in + inset1, y1, z1)
+				var d := Vector3(x_in + inset0, y1, z0)
+				var nrm := (b - a).cross(d - a).normalized()
+				_quad(st, a, b, c, d, nrm, (z1 - z0), (y1 - y0), tile)
+	_quad(st, Vector3(-hx, hy, -hz), Vector3(hx, hy, -hz), Vector3(hx, hy, hz), Vector3(-hx, hy, hz), Vector3.UP, size.x, size.z, tile)
+	_quad(st, Vector3(-hx, -hy, hz), Vector3(hx, -hy, hz), Vector3(hx, -hy, -hz), Vector3(-hx, -hy, -hz), Vector3.DOWN, size.x, size.z, tile)
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
 static func stone_arch(span: float, rise: float, depth: float, tile: float = 0.65) -> ArrayMesh:
 	var key := "arch:%.2f:%.2f:%.2f:%.2f" % [span, rise, depth, tile]
 	if _cache.has(key):

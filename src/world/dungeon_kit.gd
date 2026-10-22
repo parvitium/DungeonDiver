@@ -31,34 +31,45 @@ static func slab(size: Vector3, material: Material, socket: String, tile: float 
 	return body
 
 
+static func vault_rise(wall_h: float) -> float:
+	return clampf(wall_h * 0.28, 0.90, 1.70)
+
+
 static func flagstone_floor(size: Vector3, theme: StringName, seed_value: int) -> StaticBody3D:
 	var body := collider(size, "floor")
-	var grout := MeshFactory.visual(MeshFactory.box(Vector3(size.x, 0.04, size.z), 1.2), PBRLibrary.wear(theme), "Grout")
-	grout.position = Vector3(0, size.y * 0.5 - 0.05, 0)
-	body.add_child(grout)
-	var visual := MeshFactory.visual(MeshFactory.flagstones(size, 1.0, seed_value), PBRLibrary.floor_mat(theme), "Flagstone")
-	visual.position = Vector3(0, size.y * 0.5 - 0.01, 0)
+	var visual := MeshFactory.visual(MeshFactory.uneven_slab(size, 1.0, seed_value), PBRLibrary.floor_mat(theme), "Flagstone")
+	visual.position = Vector3(0, 0, 0)
 	body.add_child(visual)
 	body.set_meta("asset_socket", "floor")
 	return body
 
 
 static func vaulted_ceiling(size: Vector3, theme: StringName, wall_h: float) -> Node3D:
-	var rise := clampf(wall_h * 0.34, 0.95, 1.7)
+	var rise := vault_rise(wall_h)
 	var root := Node3D.new()
 	root.name = "Vault"
 	root.set_meta("asset_socket", "ceiling")
-	var visual := MeshFactory.visual(MeshFactory.vault_ceiling(size, rise, 1.1, 8), PBRLibrary.ceiling(theme), "VaultMesh")
+	var visual := MeshFactory.visual(MeshFactory.vault_ceiling(size, rise, 1.1, 10), PBRLibrary.ceiling(theme), "VaultMesh")
 	root.add_child(visual)
-	for i in 3:
-		var t := (float(i) / 2.0 - 0.5)
+	for i in 4:
+		var t := (float(i) / 3.0 - 0.5)
 		var rib := MeshFactory.visual(
-			MeshFactory.beveled_box(Vector3(size.x - 0.8, 0.12, 0.16), 0.02, 0.7),
+			MeshFactory.beveled_box(Vector3(size.x - 0.7, 0.14, 0.18), 0.02, 0.7),
 			PBRLibrary.trim(theme),
 			"VaultRib"
 		)
-		rib.position = Vector3(0, rise * 0.35, t * (size.z - 1.6))
+		rib.position = Vector3(0, rise * 0.42, t * (size.z - 1.4))
 		root.add_child(rib)
+	var cross := MeshFactory.visual(
+		MeshFactory.beveled_box(Vector3(0.18, 0.14, size.z - 0.7), 0.02, 0.7),
+		PBRLibrary.trim(theme),
+		"VaultRib"
+	)
+	cross.position = Vector3(0, rise * 0.42, 0)
+	root.add_child(cross)
+	var boss := MeshFactory.visual(MeshFactory.cylinder(0.16, 0.22, 10, 0.4), PBRLibrary.trim(theme), "VaultBoss")
+	boss.position = Vector3(0, rise * 0.55, 0)
+	root.add_child(boss)
 	return root
 
 
@@ -134,21 +145,35 @@ static func wall_run(parent: Node3D, center: Vector3, size: Vector3, has_door: b
 	_arch(parent, center, size, theme, dir)
 
 
+static func column_at(parent: Node3D, pos: Vector3, wall_h: float, theme: StringName, name: String = "pillar") -> Node3D:
+	var root := Node3D.new()
+	root.name = name
+	root.position = pos
+	root.set_meta("asset_socket", "pillar")
+	var plinth := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.78, 0.14, 0.78), 0.03, 0.5), PBRLibrary.trim(theme), "PillarPlinth")
+	plinth.position = Vector3(0, 0.07, 0)
+	root.add_child(plinth)
+	var base := MeshFactory.visual(MeshFactory.cylinder(0.30, 0.22, 14, 0.55), PBRLibrary.trim(theme), "PillarBase")
+	base.position = Vector3(0, 0.22, 0)
+	root.add_child(base)
+	var shaft_h := maxf(1.2, wall_h - 0.62)
+	var shaft := MeshFactory.visual(MeshFactory.cylinder(0.155, shaft_h, 12, 0.7), PBRLibrary.trim(theme), "PillarShaft")
+	shaft.position = Vector3(0, 0.33 + shaft_h * 0.5, 0)
+	root.add_child(shaft)
+	var neck := MeshFactory.visual(MeshFactory.cylinder(0.20, 0.10, 12, 0.5), PBRLibrary.trim(theme), "PillarNeck")
+	neck.position = Vector3(0, wall_h - 0.28, 0)
+	root.add_child(neck)
+	var cap := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.64, 0.16, 0.64), 0.03, 0.5), PBRLibrary.trim(theme), "PillarCap")
+	cap.position = Vector3(0, wall_h - 0.12, 0)
+	root.add_child(cap)
+	parent.add_child(root)
+	return root
+
+
 static func pillars(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float = DD.WALL_HEIGHT) -> void:
 	var inset := DD.ROOM_SIZE * 0.5 - 3.35
 	for offset in [Vector3(inset, 0, inset), Vector3(-inset, 0, inset), Vector3(inset, 0, -inset), Vector3(-inset, 0, -inset)]:
-		var authored := AssetLibrary.instance(AssetLibrary.kit_path("pillar"))
-		var pillar: Node3D
-		if authored:
-			pillar = authored
-			pillar.name = "pillar"
-			_paint_tree(pillar, PBRLibrary.trim(theme))
-			pillar.position = origin + offset
-			pillar.scale = Vector3(1.0, wall_h / 4.0, 1.0)
-		else:
-			pillar = MeshFactory.visual(MeshFactory.cylinder(0.18, wall_h, 12, 0.7), PBRLibrary.trim(theme), "pillar")
-			pillar.position = origin + offset + Vector3(0, wall_h * 0.5, 0)
-		parent.add_child(pillar)
+		column_at(parent, origin + offset, wall_h, theme, "pillar")
 
 
 static func beams(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float = DD.WALL_HEIGHT) -> void:
@@ -169,11 +194,44 @@ static func place_prop(parent: Node3D, pos: Vector3, kind: String, theme: String
 	_place_prop(parent, pos, kind, theme)
 
 
+static func corner_decay(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float) -> void:
+	var half := DD.ROOM_SIZE * 0.5 - 0.36
+	var corners: Array[Dictionary] = [
+		{"pos": Vector3(-half + 0.08, 0.22, -half + 0.08), "yaw": PI * 0.25},
+		{"pos": Vector3(half - 0.08, 0.22, -half + 0.08), "yaw": -PI * 0.25},
+		{"pos": Vector3(-half + 0.08, 0.22, half - 0.08), "yaw": PI * 0.75},
+		{"pos": Vector3(half - 0.08, 0.22, half - 0.08), "yaw": -PI * 0.75},
+	]
+	for spec in corners:
+		var moss := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.35, 0.72, 0.11), 0.025, 0.45), PBRLibrary.moss(), "Moss")
+		moss.position = origin + spec["pos"] + Vector3(0, 0.18, 0)
+		moss.rotation.y = spec["yaw"]
+		parent.add_child(moss)
+		var damp := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.85, 0.9, 0.04), 0.01, 0.5), PBRLibrary.wet(theme), "Damp")
+		damp.position = origin + spec["pos"] + Vector3(0, 0.55, 0)
+		damp.rotation.y = spec["yaw"]
+		parent.add_child(damp)
+		var stain := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.7, 0.18, 0.05), 0.01, 0.4), PBRLibrary.grime(theme), "Grime")
+		stain.position = origin + spec["pos"] + Vector3(0, 0.02, 0)
+		stain.rotation.y = spec["yaw"]
+		parent.add_child(stain)
+	var mid_moss := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.4, 0.28, 0.06), 0.015, 0.5), PBRLibrary.moss(), "Moss")
+	mid_moss.position = origin + Vector3(-half + 0.06, 0.18, 1.6)
+	mid_moss.rotation.y = PI * 0.5
+	parent.add_child(mid_moss)
+	if wall_h > 4.8:
+		var high := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.9, 0.7, 0.05), 0.015, 0.45), PBRLibrary.wet(theme), "Damp")
+		high.position = origin + Vector3(half - 0.08, 1.1, -2.2)
+		high.rotation.y = -PI * 0.5
+		parent.add_child(high)
+
+
 static func decorate(parent: Node3D, origin: Vector3, room: RoomSpec, theme: StringName) -> void:
 	var seed_hash := int(origin.x * 17.0 + origin.z * 31.0) + int(room.kind)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_hash if seed_hash != 0 else 1
 	_floor_dressing(parent, origin, theme, rng)
+	corner_decay(parent, origin, theme, room.wall_height())
 	if room.kind == DD.RoomKind.START:
 		_place_prop(parent, origin + Vector3(3.8, 0.0, 3.2), "bones", theme)
 		_place_prop(parent, origin + Vector3(3.6, 0.0, -2.8), "barrel", theme)
@@ -430,30 +488,39 @@ static func _paneled_wall(parent: Node3D, center: Vector3, size: Vector3, theme:
 	parent.add_child(body)
 	var axis_x := dir == "n" or dir == "s"
 	var length := size.x if axis_x else size.z
-	var panels := 3 if length > 8.0 else 2
-	var panel_len := length / float(panels)
-	var inward := Vector3(0, 0, 0.045) if dir == "n" else Vector3(0, 0, -0.045) if dir == "s" else Vector3(-0.045, 0, 0) if dir == "e" else Vector3(0.045, 0, 0)
-	for i in panels:
-		var t := (float(i) + 0.5) / float(panels) - 0.5
-		var offset := Vector3(t * length, 0, 0) if axis_x else Vector3(0, 0, t * length)
-		var depth_jitter := 0.025 if i % 2 == 0 else -0.02
-		var panel_size := Vector3(panel_len - 0.16, size.y - 0.08, size.z) if axis_x else Vector3(size.x, size.y - 0.08, panel_len - 0.16)
-		var panel := MeshFactory.visual(MeshFactory.beveled_box(panel_size, 0.04, 1.0), PBRLibrary.wall(theme), "WallPanel")
-		panel.position = center + offset + inward * (1.0 + depth_jitter * 8.0)
-		parent.add_child(panel)
-		if i < panels - 1:
-			var pil_off := Vector3((float(i + 1) / float(panels) - 0.5) * length, 0, 0) if axis_x else Vector3(0, 0, (float(i + 1) / float(panels) - 0.5) * length)
-			var pil_size := Vector3(0.22, size.y, size.z + 0.1) if axis_x else Vector3(size.x + 0.1, size.y, 0.22)
-			var pilaster := MeshFactory.visual(MeshFactory.beveled_box(pil_size, 0.03, 0.7), PBRLibrary.trim(theme), "Pilaster")
-			pilaster.position = center + pil_off + inward * 1.4
-			parent.add_child(pilaster)
+	var inward := Vector3(0, 0, 0.05) if dir == "n" else Vector3(0, 0, -0.05) if dir == "s" else Vector3(-0.05, 0, 0) if dir == "e" else Vector3(0.05, 0, 0)
+	var seed_value := int(center.x * 13.0 + center.z * 29.0 + center.y * 7.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value if seed_value != 0 else 1
+	var courses := maxi(4, int(size.y / 0.78))
+	var course_h := (size.y - 0.12) / float(courses)
+	for c in courses:
+		var y := -size.y * 0.5 + 0.08 + (float(c) + 0.5) * course_h
+		var cursor := -length * 0.5
+		var stagger := 0.18 if c % 2 == 1 else 0.0
+		cursor += stagger * 0.5
+		while cursor < length * 0.5 - 0.2:
+			var block_len := rng.randf_range(0.85, 1.55)
+			if cursor + block_len > length * 0.5:
+				block_len = length * 0.5 - cursor
+			if block_len < 0.28:
+				break
+			var depth_jit := rng.randf_range(0.02, 0.16)
+			var h_jit := rng.randf_range(-0.05, 0.08)
+			var block_size := Vector3(block_len - 0.04, course_h - 0.06 + h_jit, size.z + depth_jit) if axis_x else Vector3(size.x + depth_jit, course_h - 0.06 + h_jit, block_len - 0.04)
+			var mid := cursor + block_len * 0.5
+			var offset := Vector3(mid, y, 0) if axis_x else Vector3(0, y, mid)
+			var block := MeshFactory.visual(MeshFactory.beveled_box(block_size, 0.025, 1.0), PBRLibrary.wall(theme), "WallStone")
+			block.position = center + offset + inward * (1.0 + depth_jit * 4.0)
+			parent.add_child(block)
+			cursor += block_len
 	_add_trim(parent, center, size, theme, dir, false)
 	var wear := MeshFactory.visual(
-		MeshFactory.beveled_box(Vector3(size.x, 0.12, size.z + 0.06) if axis_x else Vector3(size.x + 0.06, 0.12, size.z), 0.015, 0.6),
-		PBRLibrary.wear(theme),
-		"Wear"
+		MeshFactory.beveled_box(Vector3(size.x, 0.16, size.z + 0.08) if axis_x else Vector3(size.x + 0.08, 0.16, size.z), 0.015, 0.6),
+		PBRLibrary.grime(theme),
+		"Grime"
 	)
-	wear.position = center + Vector3(0, -size.y * 0.5 + 0.22, 0) + inward
+	wear.position = center + Vector3(0, -size.y * 0.5 + 0.18, 0) + inward
 	parent.add_child(wear)
 
 

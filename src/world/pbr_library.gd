@@ -23,14 +23,14 @@ static func meters_to_uv(meters: float) -> Vector3:
 
 static func wall(theme: StringName) -> StandardMaterial3D:
 	if theme == &"cavern":
-		return _pbr("cavern_rock", Color(0.88, 0.84, 0.76), 0.92, 0.0, METERS_ROCK, 1.05)
-	return _pbr("crypt_brick", Color(1.0, 0.98, 0.94), 0.84, 0.0, METERS_BRICK, 1.05)
+		return _pbr("cavern_rock", Color(0.88, 0.84, 0.76), 0.92, 0.0, METERS_ROCK, 1.15, 0.03)
+	return _pbr("crypt_brick", Color(1.0, 0.98, 0.94), 0.84, 0.0, METERS_BRICK, 1.2, 0.035)
 
 
 static func floor_mat(theme: StringName) -> StandardMaterial3D:
 	if theme == &"cavern":
-		return _pbr("cavern_floor", Color(0.80, 0.76, 0.66), 0.94, 0.0, METERS_FLOOR, 0.9)
-	return _pbr("crypt_floor", Color(0.86, 0.87, 0.88), 0.88, 0.0, METERS_FLOOR, 0.95)
+		return _pbr("cavern_floor", Color(0.80, 0.76, 0.66), 0.94, 0.0, METERS_FLOOR, 1.15, 0.055)
+	return _pbr("crypt_floor", Color(0.86, 0.87, 0.88), 0.88, 0.0, METERS_FLOOR, 1.25, 0.06)
 
 
 static func ceiling(theme: StringName) -> StandardMaterial3D:
@@ -86,6 +86,54 @@ static func skin() -> StandardMaterial3D:
 
 static func fur() -> StandardMaterial3D:
 	return _pbr("fur", Color(0.78, 0.62, 0.42), 0.88, 0.0, 0.42, 1.55)
+
+
+static func moss() -> StandardMaterial3D:
+	var mat := _pbr("moss", Color(0.42, 0.55, 0.28), 0.92, 0.0, 0.7, 1.4)
+	mat.roughness = 0.9
+	mat.metallic = 0.0
+	return mat
+
+
+static func grime(theme: StringName) -> StandardMaterial3D:
+	var key := "grime:%s" % String(theme)
+	if _cache.has(key):
+		return _cache[key]
+	var mat := wear(theme).duplicate() as StandardMaterial3D
+	mat.albedo_color = mat.albedo_color.darkened(0.35)
+	mat.roughness = 0.96
+	_cache[key] = mat
+	return mat
+
+
+static func tattered_cloth(color: Color) -> StandardMaterial3D:
+	var key := "tatter:%s" % color.to_html()
+	if _cache.has(key):
+		return _cache[key]
+	var mat := cloth(color).duplicate() as StandardMaterial3D
+	var tatter := _tex_path("cloth", "tatter.png")
+	if tatter:
+		mat.albedo_texture = tatter
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		mat.alpha_scissor_threshold = 0.32
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = color
+	_cache[key] = mat
+	return mat
+
+
+static func fur_card() -> StandardMaterial3D:
+	if _cache.has("fur_card"):
+		return _cache["fur_card"]
+	var mat := fur().duplicate() as StandardMaterial3D
+	var shell := _tex_path("fur", "shell.png")
+	if shell:
+		mat.albedo_texture = shell
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		mat.alpha_scissor_threshold = 0.28
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_cache["fur_card"] = mat
+	return mat
 
 
 static func wet(theme: StringName) -> StandardMaterial3D:
@@ -156,8 +204,8 @@ static func tinted(base: StandardMaterial3D, color: Color) -> StandardMaterial3D
 	return mat
 
 
-static func _pbr(folder: String, albedo: Color, roughness: float, metallic: float, meters: float, normal_scale: float) -> StandardMaterial3D:
-	var key := "%s:%.2f:%.2f:%.2f:%.2f" % [folder, roughness, metallic, meters, normal_scale]
+static func _pbr(folder: String, albedo: Color, roughness: float, metallic: float, meters: float, normal_scale: float, height_scale: float = 0.0) -> StandardMaterial3D:
+	var key := "%s:%.2f:%.2f:%.2f:%.2f:%.3f" % [folder, roughness, metallic, meters, normal_scale, height_scale]
 	if _cache.has(key):
 		return _cache[key]
 	var mat := StandardMaterial3D.new()
@@ -184,6 +232,14 @@ static func _pbr(folder: String, albedo: Color, roughness: float, metallic: floa
 		mat.ao_enabled = true
 		mat.ao_texture = ao_tex
 		mat.ao_light_affect = 0.55
+	var height_tex := _tex(folder, "height.jpg")
+	if height_tex and height_scale > 0.0:
+		mat.heightmap_enabled = true
+		mat.heightmap_scale = height_scale
+		mat.heightmap_deep_parallax = true
+		mat.heightmap_min_layers = 8
+		mat.heightmap_max_layers = 24
+		mat.heightmap_texture = height_tex
 	if metallic > 0.4:
 		mat.metallic_specular = 0.55
 	_cache[key] = mat
@@ -191,6 +247,10 @@ static func _pbr(folder: String, albedo: Color, roughness: float, metallic: floa
 
 
 static func _tex(folder: String, file: String) -> Texture2D:
+	return _tex_path(folder, file)
+
+
+static func _tex_path(folder: String, file: String) -> Texture2D:
 	var path := "res://assets/textures/%s/%s" % [folder, file]
 	if ResourceLoader.exists(path):
 		return load(path) as Texture2D

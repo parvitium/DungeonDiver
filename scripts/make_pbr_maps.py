@@ -303,11 +303,151 @@ def write_import_stub(folder: str) -> None:
         )
 
 
+def make_moss() -> None:
+    n = SIZE
+    clumps = fbm(n, n, [(64, 0.4), (18, 0.35), (6, 0.25)], 41)
+    albedo = Image.new("RGB", (n, n))
+    height = [[0.0] * n for _ in range(n)]
+    rough = [[0.0] * n for _ in range(n)]
+    px = albedo.load()
+    for y in range(n):
+        for x in range(n):
+            m = clumps[y][x]
+            r = 28 + m * 70
+            g = 72 + m * 110
+            b = 22 + m * 40
+            px[x, y] = (int(r), int(g), int(b))
+            height[y][x] = 0.25 + m * 0.6
+            rough[y][x] = 0.82 + m * 0.12
+    ao = [[0.4 + clumps[y][x] * 0.5 for x in range(n)] for y in range(n)]
+    save_set("moss", albedo, height_to_normal(height, 3.4), to_img(rough), to_img(ao))
+
+
+def make_tatter_png() -> None:
+    n = 512
+    im = Image.new("RGBA", (n, n), (48, 36, 28, 0))
+    px = im.load()
+    rng = random.Random(19)
+    noise = fbm(n, n, [(40, 0.5), (12, 0.3), (4, 0.2)], 8)
+    for y in range(n):
+        for x in range(n):
+            v = noise[y][x]
+            edge = min(x, n - 1 - x, y, n - 1 - y) / (n * 0.5)
+            tatter = 1.0 if v > 0.38 + (1.0 - edge) * 0.22 else 0.0
+            if y > n * 0.55:
+                tatter *= 1.0 if (v + 0.15 * math.sin(x * 0.2)) > 0.42 else 0.0
+            a = int(255 * tatter)
+            if a < 20:
+                continue
+            shade = 70 + int(v * 50)
+            px[x, y] = (shade + 8, shade - 6, shade - 18, a)
+    dest = TEX / "cloth"
+    dest.mkdir(parents=True, exist_ok=True)
+    im.save(dest / "tatter.png", "PNG", optimize=True)
+    print("wrote cloth/tatter.png")
+
+
+def make_fur_alpha() -> None:
+    n = 512
+    im = Image.new("RGBA", (n, n), (90, 64, 42, 0))
+    px = im.load()
+    rng = random.Random(3)
+    for _ in range(2400):
+        x = rng.randint(8, n - 9)
+        y = rng.randint(0, n - 1)
+        length = rng.randint(12, 40)
+        ang = rng.uniform(-0.35, 0.35) - math.pi * 0.5
+        ca, sa = math.cos(ang), math.sin(ang)
+        color = rng.choice([(42, 30, 20), (118, 82, 48), (28, 22, 18), (160, 124, 82)])
+        for i in range(length):
+            xx = int(x + ca * i)
+            yy = int(y + sa * i)
+            if 0 <= xx < n and 0 <= yy < n:
+                fade = 1.0 - i / length
+                a = int(220 * fade)
+                r, g, b, _ = px[xx, yy]
+                if a > 0:
+                    px[xx, yy] = (color[0], color[1], color[2], max(a, px[xx, yy][3]))
+    dest = TEX / "fur"
+    dest.mkdir(parents=True, exist_ok=True)
+    im.save(dest / "shell.png", "PNG", optimize=True)
+    print("wrote fur/shell.png")
+
+
+def make_floor_height() -> None:
+    for folder in ("crypt_floor", "cavern_floor", "crypt_brick", "cavern_rock"):
+        src = TEX / folder / "albedo.jpg"
+        if not src.exists():
+            continue
+        im = Image.open(src).convert("L")
+        im = ImageEnhance.Contrast(im).enhance(1.35)
+        # Dark grout / cracks become low pixels in the height map.
+        dest = TEX / folder / "height.jpg"
+        im.save(dest, "JPEG", quality=JPEG_Q, optimize=True)
+        print(f"wrote {folder}/height.jpg")
+
+
+def write_png_import_stub(rel: str) -> None:
+    path = TEX / rel
+    stub = path.with_suffix(path.suffix + ".import")
+    if stub.exists():
+        return
+    stub.write_text(
+        "\n".join(
+            [
+                "[remap]",
+                "",
+                'importer="texture"',
+                'type="CompressedTexture2D"',
+                "",
+                "[deps]",
+                "",
+                f'source_file="res://assets/textures/{rel}"',
+                "",
+                "[params]",
+                "",
+                "compress/mode=2",
+                "compress/high_quality=false",
+                "compress/lossy_quality=0.72",
+                "compress/uastc_level=0",
+                "compress/rdo_quality_loss=0.0",
+                "compress/hdr_compression=1",
+                "compress/normal_map=0",
+                "compress/channel_pack=0",
+                "mipmaps/generate=true",
+                "mipmaps/limit=-1",
+                "roughness/mode=0",
+                'roughness/src_normal=""',
+                "process/fix_alpha_border=true",
+                "process/premult_alpha=false",
+                "process/normal_map_invert_y=false",
+                "process/hdr_as_srgb=false",
+                "process/hdr_clamp_exposure=false",
+                "process/size_limit=1024",
+                "detect_3d/compress_to=1",
+                "",
+            ]
+        )
+    )
+
+
 def main() -> int:
     make_skin()
     make_fur()
+    make_moss()
+    make_tatter_png()
+    make_fur_alpha()
+    make_floor_height()
     write_import_stub("skin")
     write_import_stub("fur")
+    write_import_stub("moss")
+    write_png_import_stub("cloth/tatter.png")
+    write_png_import_stub("fur/shell.png")
+    for folder in ("crypt_floor", "cavern_floor", "crypt_brick", "cavern_rock"):
+        write_import_stub(folder)  # no-op if albedo stubs exist; height added below
+        height_stub = TEX / folder / "height.jpg.import"
+        if not height_stub.exists() and (TEX / folder / "height.jpg").exists():
+            write_png_import_stub(f"{folder}/height.jpg")
     recompress_existing()
     patch_imports()
     print("PBR_MAPS_OK")

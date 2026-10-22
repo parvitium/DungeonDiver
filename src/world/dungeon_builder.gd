@@ -44,8 +44,7 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: 
 	nav.add_child(floor_body)
 
 	var ceiling := DungeonKit.vaulted_ceiling(Vector3(DD.ROOM_SIZE, 0.28, DD.ROOM_SIZE), theme, wall_h)
-	var rise := clampf(wall_h * 0.34, 0.95, 1.7)
-	ceiling.position = origin + Vector3(0, wall_h - rise + 0.12, 0)
+	ceiling.position = origin + Vector3(0, wall_h - 0.10, 0)
 	parent.add_child(ceiling)
 
 	DungeonKit.wall_run(parent, origin + Vector3(0, wall_h * 0.5, -half), Vector3(DD.ROOM_SIZE, wall_h, DD.WALL_THICKNESS), bool(room.doors["n"]), theme, "n")

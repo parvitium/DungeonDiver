@@ -157,8 +157,9 @@ func _capture_creature_sheet(dungeon_id: StringName) -> void:
 		if side.length() < 0.05:
 			side = Vector3(1, 0, 0)
 		side = side.normalized()
-		var side_amt := 0.85 if id == "cave_wolf" else 0.48
-		player.global_position = gameplay - dir * (0.95 if id == "cave_wolf" else 0.78) + side * side_amt
+		var side_amt := 0.85 if id == "cave_wolf" else (0.62 if id == "cave_troll" else 0.48)
+		var back_amt := 1.35 if id == "cave_troll" else (0.95 if id == "cave_wolf" else 0.78)
+		player.global_position = gameplay - dir * back_amt + side * side_amt
 		_face_toward(mob, player.global_position)
 		_aim_player_at(player, mob)
 		if player is Player:
@@ -167,6 +168,25 @@ func _capture_creature_sheet(dungeon_id: StringName) -> void:
 				player._camera.get_parent().rotation.x = (player as Player).look_pitch
 		await _settle(5)
 		_save("%s_close" % id)
+		var anim := AssetLibrary.first_animation_player(mob)
+		if anim:
+			AssetLibrary.play_if_has(anim, "death")
+			var clip := AssetLibrary.resolve_clip(anim, "death")
+			if not clip.is_empty():
+				var animation := anim.get_animation(clip)
+				if animation:
+					anim.seek(animation.length, true)
+			var skel := mob.find_child("Skeleton3D", true, false)
+			if skel is Skeleton3D:
+				(skel as Skeleton3D).force_update_all_bone_transforms()
+			player.global_position = gameplay - dir * 1.6 + Vector3(0, 0.15, 0)
+			_aim_player_at(player, mob)
+			if player is Player:
+				(player as Player).look_pitch = -0.28
+				if player._camera:
+					player._camera.get_parent().rotation.x = (player as Player).look_pitch
+			await _settle(6)
+			_save("%s_death" % id)
 		mob.queue_free()
 		await _settle(2)
 	GameSession.accept_local_input = true

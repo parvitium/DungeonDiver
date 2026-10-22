@@ -57,11 +57,11 @@ func spawn_offset() -> Vector3:
 func wall_height() -> float:
 	match kind:
 		DD.RoomKind.START:
-			return 3.55
+			return 3.85
 		DD.RoomKind.TREASURE:
-			return 3.9
+			return 5.05
 		DD.RoomKind.BOSS:
-			return 5.35
+			return 6.35
 		_:
 			return DD.WALL_HEIGHT
 

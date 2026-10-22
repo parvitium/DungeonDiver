@@ -63,6 +63,7 @@ func _build() -> void:
 
 	_visual = _make_body()
 	add_child(_visual)
+	_align_visual_forward(_visual)
 	_ground_visual(_visual)
 	_anim = AssetLibrary.first_animation_player(_visual)
 	AssetLibrary.play_if_has(_anim, "idle")
@@ -226,7 +227,14 @@ func _mat_for_part(part_name: String) -> StandardMaterial3D:
 		return PBRLibrary.metal()
 	if n.begins_with("wood") or n.begins_with("staff") or n.begins_with("club"):
 		return PBRLibrary.wood()
-	if n.begins_with("robe") or n.begins_with("cloth") or n.begins_with("hood") or n.begins_with("tatter") or n.begins_with("loin"):
+	if n.begins_with("cloth"):
+		var fringe_color := Color(0.62, 0.64, 0.66, 1.0)
+		if def and String(def.id) == "lich":
+			fringe_color = Color(0.22, 0.10, 0.28)
+		elif def == null or String(def.id) != "wraith":
+			fringe_color = Color(0.28, 0.16, 0.10)
+		return PBRLibrary.tattered_cloth(fringe_color)
+	if n.begins_with("robe") or n.begins_with("hood") or n.begins_with("tatter") or n.begins_with("loin"):
 		if def and String(def.id) == "wraith":
 			var ghost := PBRLibrary.cloth(Color(0.68, 0.72, 0.74, 0.84))
 			ghost = ghost.duplicate() as StandardMaterial3D
@@ -238,6 +246,8 @@ func _mat_for_part(part_name: String) -> StandardMaterial3D:
 			ghost.cull_mode = BaseMaterial3D.CULL_DISABLED
 			return ghost
 		return PBRLibrary.cloth(Color(0.22, 0.10, 0.28) if def and String(def.id) == "lich" else Color(0.28, 0.16, 0.10))
+	if n.begins_with("fur_shell") or n.begins_with("fur_card"):
+		return PBRLibrary.fur_card()
 	if n.begins_with("fur"):
 		return PBRLibrary.fur()
 	if n.begins_with("skin") or n.begins_with("wart") or n.begins_with("scar"):
@@ -385,6 +395,32 @@ func _refresh_health_bar() -> void:
 	var ratio := clampf(health / maxf(1.0, max_health), 0.0, 1.0)
 	_hp_fill.scale = Vector3(ratio, 1.0, 1.0)
 	_hp_fill.position.x = -0.26 * (1.0 - ratio)
+
+
+func _align_visual_forward(root: Node3D) -> void:
+	# Godot look_at aims local -Z at the player. If the authored face sits on +Z, spin it.
+	var face_z := _face_marker_z(root)
+	if face_z > 0.04:
+		root.rotate_y(PI)
+
+
+func _face_marker_z(root: Node) -> float:
+	var total := 0.0
+	var count := 0
+	var nodes: Array[Node] = [root]
+	while not nodes.is_empty():
+		var node: Node = nodes.pop_back()
+		var n := String(node.name).to_lower()
+		if node is MeshInstance3D and (n.contains("eye") or n.contains("snout") or n.contains("tusk") or n.begins_with("hood") or n.contains("cavity_eye")):
+			var mi := node as MeshInstance3D
+			var xf := _relative_xform(root, mi)
+			total += (xf * mi.get_aabb().get_center()).z
+			count += 1
+		for child in node.get_children():
+			nodes.append(child)
+	if count == 0:
+		return 0.0
+	return total / float(count)
 
 
 func _ground_visual(root: Node3D) -> void:

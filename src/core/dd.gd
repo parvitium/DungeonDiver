@@ -28,7 +28,7 @@ const HURTBOX_LAYER := 32
 
 const ROOM_SIZE := 14.0
 const WALL_THICKNESS := 0.45
-const WALL_HEIGHT := 4.2
+const WALL_HEIGHT := 4.65
 const DOOR_WIDTH := 2.8
 const DOOR_HEIGHT := 3.0
 
