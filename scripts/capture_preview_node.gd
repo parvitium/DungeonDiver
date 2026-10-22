@@ -59,20 +59,71 @@ func _capture_dungeon(dungeon_id: StringName, label: String) -> void:
 		await _settle(6)
 		_save(label + "_look")
 		var mobs := get_tree().get_nodes_in_group("monsters")
-		if not mobs.is_empty() and mobs[0] is Node3D:
-			var mob: Node3D = mobs[0]
-			player.global_position = mob.global_position + Vector3(0.0, 0.05, 2.8)
-			player.rotation_degrees = Vector3.ZERO
-			player.look_at(mob.global_position + Vector3(0, 0.9, 0), Vector3.UP)
-			player.look_pitch = -0.08
-			if player._camera:
-				player._camera.get_parent().rotation.x = player.look_pitch
+		var mob: Node3D = _pick_showcase_monster(mobs)
+		if mob:
+			GameSession.accept_local_input = false
+			player.input_enabled = false
+			player.set_physics_process(false)
+			mob.set_physics_process(false)
+			var stand: Vector3 = player.global_position
+			var dir: Vector3 = _open_offset(player).normalized()
+			player.global_position = stand + dir * 1.45
+			mob.global_position = stand + dir * 3.55
+			if mob.has_method("sync_home"):
+				mob.call("sync_home")
+			_aim_player_at(player, mob)
+			_face_toward(mob, player.global_position)
+			var lamp := OmniLight3D.new()
+			lamp.name = "CaptureFill"
+			lamp.light_color = Color(1.0, 0.90, 0.74)
+			lamp.light_energy = 6.2
+			lamp.omni_range = 8.0
+			lamp.omni_attenuation = 0.9
+			lamp.shadow_enabled = false
+			lamp.position = Vector3(0.2, 1.6, 0.8)
+			mob.add_child(lamp)
+			if mob.has_method("receive_hit"):
+				mob.call("receive_hit", 4.0, player.global_position, true)
 			await _settle(8)
+			_aim_player_at(player, mob)
+			await _settle(3)
 			_save(label + "_monster")
+			if label == "crypt":
+				await _capture_hud_overlays(run, player)
+			GameSession.accept_local_input = true
 	run.queue_free()
 	if GameSession.run != null:
 		GameSession.end_run(false)
 	await _settle(2)
+
+
+func _capture_hud_overlays(run: Node, player: Node) -> void:
+	var hud: Node = null
+	for child in run.get_children():
+		if child is CanvasLayer and child.has_method("bind_player"):
+			hud = child
+			break
+	if hud == null:
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if hud.get("_pause_panel"):
+		hud._close_all()
+		hud._pause_panel.visible = true
+		hud._pause_panel.refresh()
+		GameSession.ui_open = true
+		await _settle(6)
+		_save("pause")
+		hud._pause_panel.visible = false
+	if hud.get("_bestiary_panel"):
+		hud._bestiary_panel.visible = true
+		hud._bestiary_panel.refresh()
+		GameSession.ui_open = true
+		await _settle(6)
+		_save("bestiary")
+		hud._bestiary_panel.visible = false
+	hud._close_all()
+	if player:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _save(name: String) -> void:
@@ -80,6 +131,70 @@ func _save(name: String) -> void:
 	var path := "%s/%s_%s.png" % [_out_dir, _tag, name]
 	var err := img.save_png(path)
 	print("WROTE %s err=%s %dx%d" % [path, str(err), img.get_width(), img.get_height()])
+
+
+func _pick_showcase_monster(mobs: Array) -> Node3D:
+	for node in mobs:
+		if node is Node3D and node.get("def") and String(node.def.id) == "skeleton":
+			return node
+	for node in mobs:
+		if node is Node3D:
+			return node
+	return null
+
+
+func _open_offset(player: Node3D) -> Vector3:
+	var origin := player.global_position + Vector3(0, 1.2, 0)
+	var dirs: Array[Vector3] = [
+		-player.global_transform.basis.z,
+		Vector3(0, 0, -1),
+		Vector3(0, 0, 1),
+		Vector3(1, 0, 0),
+		Vector3(-1, 0, 0),
+		Vector3(0.7, 0, -0.7),
+		Vector3(-0.7, 0, -0.7),
+	]
+	var space := player.get_world_3d().direct_space_state
+	var best := Vector3(0, 0, -2.5)
+	var best_dist := 0.0
+	for raw in dirs:
+		var dir := raw
+		dir.y = 0
+		if dir.length() < 0.05:
+			continue
+		dir = dir.normalized()
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * 8.0)
+		query.collision_mask = DD.WORLD_LAYER
+		query.exclude = [player.get_rid()]
+		var hit := space.intersect_ray(query)
+		var dist := 8.0 if hit.is_empty() else origin.distance_to(hit.position)
+		if dist > best_dist:
+			best_dist = dist
+			best = dir * clampf(dist * 0.42, 2.1, 2.8)
+	return best
+
+
+func _face_toward(node: Node3D, point: Vector3) -> void:
+	var look := point
+	look.y = node.global_position.y
+	if look.distance_to(node.global_position) > 0.05:
+		node.look_at(look, Vector3.UP)
+
+
+func _aim_player_at(player: Node3D, mob: Node3D) -> void:
+	var desired := mob.global_position - player.global_position
+	desired.y = 0
+	if desired.length() < 0.05:
+		return
+	var current := -player.global_transform.basis.z
+	current.y = 0
+	if current.length() < 0.05:
+		current = Vector3(0, 0, -1)
+	player.rotate_y(current.signed_angle_to(desired, Vector3.UP))
+	if player is Player:
+		(player as Player).look_pitch = -0.06
+		if player._camera:
+			player._camera.get_parent().rotation.x = (player as Player).look_pitch
 
 
 func _settle(frames: int) -> void:

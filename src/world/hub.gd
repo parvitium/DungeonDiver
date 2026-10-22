@@ -17,6 +17,8 @@ func _ready() -> void:
 func _try_continue() -> void:
 	if SaveService.has_save():
 		_apply_load_result(SaveService.load_game())
+	elif not SaveService.last_quarantine_path.is_empty():
+		_apply_load_result(false)
 
 
 func load_notice_text() -> String:

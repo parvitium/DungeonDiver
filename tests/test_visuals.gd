@@ -29,8 +29,36 @@ static func run() -> DDTest:
 	t.assert_gt(float((bevel.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()), 24.0, "bevel adds verts")
 
 	t.assert_true(ResourceLoader.exists("res://assets/meshes/monsters/skeleton.glb"), "skeleton glb")
+	t.assert_true(ResourceLoader.exists("res://assets/meshes/monsters/cave_wolf.glb"), "wolf glb")
+	t.assert_true(ResourceLoader.exists("res://assets/meshes/monsters/wraith.glb"), "wraith glb")
+	t.assert_true(ResourceLoader.exists("res://assets/meshes/monsters/lich.glb"), "lich glb")
+	t.assert_true(ResourceLoader.exists("res://assets/meshes/monsters/cave_troll.glb"), "troll glb")
 	t.assert_true(ResourceLoader.exists("res://assets/meshes/weapons/sword.glb"), "sword glb")
 	t.assert_true(ResourceLoader.exists("res://assets/meshes/props/torch.glb"), "torch glb")
+
+	var bone := PBRLibrary.bone()
+	t.assert_true(bone.albedo_color.r >= 0.85, "bone is light")
+	t.assert_true(absf(bone.albedo_color.r - bone.albedo_color.b) < 0.18, "bone is not sandy orange")
+	t.assert_true(bone.albedo_texture != null, "bone has albedo map")
+
+	# Runtime load so autoload names exist (`-s` compiles class_name deps before autoloads).
+	var monster_script: GDScript = load("res://src/monster/monster.gd")
+	var tree := Engine.get_main_loop() as SceneTree
+	for monster_def in Catalog.all_monsters():
+		var mob: Node = monster_script.new()
+		tree.root.add_child(mob)
+		mob.call("setup", monster_def, 1)
+		t.assert_true(mob.get_node_or_null("HealthBar") != null, "%s health bar exists" % monster_def.id)
+		t.assert_false((mob.get_node("HealthBar") as Node3D).visible, "%s health bar hidden until hit" % monster_def.id)
+		t.assert_false(_has_label3d(mob), "%s has no floating name label" % monster_def.id)
+		var anim := AssetLibrary.first_animation_player(mob)
+		t.assert_true(anim != null, "%s has AnimationPlayer" % monster_def.id)
+		for clip in ["idle", "walk", "attack", "hit", "death"]:
+			t.assert_true(not AssetLibrary.resolve_clip(anim, clip).is_empty(), "%s clip %s" % [monster_def.id, clip])
+		if String(monster_def.id) == "skeleton":
+			mob.call("receive_hit", 1.0, Vector3.ZERO, true)
+			t.assert_true((mob.get_node("HealthBar") as Node3D).visible, "health bar shows on hit")
+		mob.free()
 
 	var def: DungeonTypeDef = Catalog.all_dungeons()[0]
 	var blueprint := DungeonGenerator.generate(def, 1, 77)
@@ -48,5 +76,14 @@ static func _has_socket(node: Node) -> bool:
 		return true
 	for child in node.get_children():
 		if _has_socket(child):
+			return true
+	return false
+
+
+static func _has_label3d(node: Node) -> bool:
+	if node is Label3D:
+		return true
+	for child in node.get_children():
+		if _has_label3d(child):
 			return true
 	return false

@@ -21,7 +21,7 @@ POLYHAVEN = {
     "cavern_floor": "forest_ground_04",
     "wood": "weathered_planks",
     "metal": "rusty_metal_02",
-    "bone": "coast_sand_02",
+    "bone": "plaster_stone_wall_01",
 }
 
 # fallbacks if a Poly Haven id 404s
@@ -32,7 +32,7 @@ POLYHAVEN_FALLBACK = {
     "cavern_floor": ["forest_ground_03", "aerial_rocks_02", "dirt_floor"],
     "wood": ["wood_planks_grey", "ancient_wooden_planks", "wood_table_001"],
     "metal": ["rusty_metal", "metal_plate", "corrugated_iron_02"],
-    "bone": ["concrete_layers_02", "limestone_01", "plaster_02"],
+    "bone": ["plaster_02", "grey_plaster_03", "concrete_layers_02"],
 }
 
 MAPS = {

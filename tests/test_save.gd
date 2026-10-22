@@ -11,6 +11,7 @@ static func run() -> DDTest:
 	_clamp_enums(t)
 	_quarantine_corrupt(t)
 	_hub_load_failure(t)
+	_title_preserves_save_notice(t)
 	return t
 
 
@@ -270,6 +271,40 @@ static func _hub_load_failure(t: DDTest) -> void:
 		"Continue shows backup message"
 	)
 	continue_hub.free()
+	session.ui_open = false
+	_cleanup_quarantine(saves, DD.SAVE_PATH)
+	session.reset_profile(false)
+
+
+static func _title_preserves_save_notice(t: DDTest) -> void:
+	var session := DDTest.autoload("GameSession")
+	var saves := DDTest.autoload("SaveService")
+	var tree := Engine.get_main_loop() as SceneTree
+	_cleanup_quarantine(saves, DD.SAVE_PATH)
+	session.profile.display_name = "TitleKeep"
+	var file := FileAccess.open(DD.SAVE_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 1, "profile": "not-a-dict"}))
+	file.close()
+
+	var title: Node = (load("res://src/world/title.gd") as GDScript).new()
+	tree.root.add_child(title)
+	if title.get_child_count() == 0:
+		title.call("_ready")
+	t.assert_true(FileAccess.file_exists(DD.SAVE_PATH), "title boot leaves the save file")
+	t.assert_eq(saves.last_quarantine_path, "", "title boot does not quarantine")
+	t.assert_eq(session.profile.display_name, "TitleKeep", "title boot leaves profile")
+	title.free()
+
+	var hub: Node = (load("res://src/world/hub.gd") as GDScript).new()
+	tree.root.add_child(hub)
+	hub.call("_try_continue")
+	t.assert_eq(session.profile.display_name, "TitleKeep", "hub still does not start a new game")
+	t.assert_true(
+		hub.load_notice_text().begins_with("Save couldn't be loaded; backed up to"),
+		"hub still shows the corrupted-save notice"
+	)
+	t.assert_true(hub.load_notice_text().contains(".corrupt-"), "hub notice includes backup path")
+	hub.free()
 	session.ui_open = false
 	_cleanup_quarantine(saves, DD.SAVE_PATH)
 	session.reset_profile(false)

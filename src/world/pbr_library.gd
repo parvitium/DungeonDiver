@@ -48,7 +48,8 @@ static func metal() -> StandardMaterial3D:
 
 
 static func bone() -> StandardMaterial3D:
-	return _pbr("bone", Color(0.90, 0.84, 0.70), 0.68, 0.0, METERS_BONE, 0.55)
+	# Ivory aged bone: plaster albedo, cool-white tint, dry roughness. Not sand.
+	return _pbr("bone", Color(0.93, 0.89, 0.80), 0.62, 0.02, METERS_BONE, 0.45)
 
 
 static func trim(theme: StringName) -> StandardMaterial3D:

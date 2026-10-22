@@ -85,6 +85,21 @@ static func apply_menu_button(btn: Button) -> void:
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 
+static func centered_sheet(parent: Control, min_size: Vector2) -> Panel:
+	var center := CenterContainer.new()
+	center.name = "Center"
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.set_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(center)
+	var panel := Panel.new()
+	panel.name = "Sheet"
+	panel.custom_minimum_size = min_size
+	panel.add_theme_stylebox_override("panel", panel())
+	center.add_child(panel)
+	return panel
+
+
 static func label(text: String, size: int = 16, color: Color = Color(0.93, 0.88, 0.75), wrap: bool = false) -> Label:
 	var lbl := Label.new()
 	lbl.text = text

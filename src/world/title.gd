@@ -12,8 +12,8 @@ var _t: float = 0.0
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	GameSession.ui_open = true
-	if SaveService.has_save():
-		SaveService.load_game()
+	# Do not load here. Quarantining a bad save on the title screen would hide
+	# the hub's corrupted-save notice. Continue/Play both go to the hub, which loads.
 	_build_hall()
 	_build_silhouette()
 	_build_camera()
@@ -110,13 +110,15 @@ func _build_hall() -> void:
 
 
 func _build_silhouette() -> void:
-	var mob := Monster.new()
+	var monster_script: GDScript = load("res://src/monster/monster.gd")
+	var mob: Node = monster_script.new()
 	var def: MonsterDef = ContentDB.get_monster(&"lich")
 	add_child(mob)
-	mob.setup(def, 1)
+	mob.call("setup", def, 1)
 	mob.set_physics_process(false)
-	mob.global_position = Vector3(0.08, 0.05, -13.6)
-	mob.rotation_degrees = Vector3(0, 180, 0)
+	if mob is Node3D:
+		(mob as Node3D).position = Vector3(0.08, 0.05, -13.6)
+		(mob as Node3D).rotation_degrees = Vector3(0, 180, 0)
 	var backlight := OmniLight3D.new()
 	backlight.position = Vector3(0, 2.1, -15.4)
 	backlight.light_color = Color(0.58, 0.38, 0.88)
@@ -146,7 +148,7 @@ func _build_camera() -> void:
 	_camera.fov = 55.0
 	_camera.position = _cam_origin
 	add_child(_camera)
-	_camera.look_at(Vector3(0, 1.35, -12))
+	_camera.look_at_from_position(_cam_origin, Vector3(0, 1.35, -12))
 
 
 func _build_ui() -> void:
@@ -221,8 +223,6 @@ func _play() -> void:
 
 
 func _continue() -> void:
-	if SaveService.has_save():
-		SaveService.load_game()
 	get_tree().change_scene_to_file("res://scenes/hub.tscn")
 
 

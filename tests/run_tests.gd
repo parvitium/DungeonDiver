@@ -13,6 +13,7 @@ const TestContentScript := preload("res://tests/test_content.gd")
 const TestCommandScript := preload("res://tests/test_command.gd")
 const TestSettingsScript := preload("res://tests/test_settings.gd")
 const TestVisualsScript := preload("res://tests/test_visuals.gd")
+const TestUIScript := preload("res://tests/test_ui.gd")
 
 
 func _initialize() -> void:
@@ -49,6 +50,7 @@ func _run() -> int:
 		_suite(TestCommandScript, "command"),
 		_suite(TestSettingsScript, "settings"),
 		_suite(TestVisualsScript, "visuals"),
+		_suite(TestUIScript, "ui"),
 		_smoke(),
 	]
 

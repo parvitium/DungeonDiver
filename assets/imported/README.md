@@ -13,4 +13,8 @@ Regenerate the shipped kit with:
 
 `blender --background --python scripts/blender/generate_assets.py`
 
-Art is CC0 (original meshes + Poly Haven textures). See `assets/CREDITS.md`. Code is MIT.
+Regenerate creatures with:
+
+`blender --background --python scripts/blender/generate_creatures.py`
+
+Art is CC0 (original meshes, Quaternius wolf, Poly Haven textures). See `assets/CREDITS.md`. Code is MIT.

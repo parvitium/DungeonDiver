@@ -28,17 +28,31 @@ static func first_animation_player(root: Node) -> AnimationPlayer:
 static func play_if_has(anim: AnimationPlayer, clip: String) -> bool:
 	if anim == null:
 		return false
+	var resolved := resolve_clip(anim, clip)
+	if resolved.is_empty():
+		return false
+	var animation := anim.get_animation(resolved)
+	if animation:
+		if clip == "idle" or clip == "walk":
+			animation.loop_mode = Animation.LOOP_LINEAR
+		else:
+			animation.loop_mode = Animation.LOOP_NONE
+	if anim.current_animation != resolved:
+		anim.play(resolved)
+	return true
+
+
+static func resolve_clip(anim: AnimationPlayer, clip: String) -> String:
+	if anim == null:
+		return ""
 	if anim.has_animation(clip):
-		if anim.current_animation != clip:
-			anim.play(clip)
-		return true
-	var names := anim.get_animation_list()
-	for name in names:
-		if String(name).ends_with("/" + clip) or String(name) == clip:
-			if anim.current_animation != name:
-				anim.play(name)
-			return true
-	return false
+		return clip
+	var needle := clip.to_lower()
+	for name in anim.get_animation_list():
+		var n := String(name).to_lower()
+		if n == needle or n.ends_with("/" + needle) or n.ends_with("_" + needle) or n.begins_with(needle + "_"):
+			return String(name)
+	return ""
 
 
 static func monster_path(id: StringName) -> String:

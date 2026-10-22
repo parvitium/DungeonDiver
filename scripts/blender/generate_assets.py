@@ -623,12 +623,8 @@ def main() -> int:
         make_bones,
         make_sword,
         make_shield,
-        make_skeleton,
-        make_wolf,
-        make_wraith,
-        make_lich,
-        make_troll,
     ]
+    # Creatures: scripts/blender/generate_creatures.py
     for fn in makers:
         print("==", fn.__name__)
         fn()

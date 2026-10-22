@@ -20,11 +20,16 @@ var _player: Node3D
 var _visual: Node3D
 var _anim: AnimationPlayer
 var _bob: float = 0.0
+var _hit_lock: float = 0.0
+var _hp_timer: float = 0.0
+var _hp_root: Node3D
+var _hp_fill: MeshInstance3D
 
 
 func setup(p_def: MonsterDef, effective_tier: int) -> void:
 	def = p_def
-	entity_id = GameSession.ai_rng.next_id("mob") if GameSession and GameSession.ai_rng else DD.new_id("mob")
+	var ai := _session_ai_rng()
+	entity_id = ai.next_id("mob") if ai else DD.new_id("mob")
 	max_health = CombatResolver.scaled_monster_health(def.max_health, effective_tier)
 	health = max_health
 	damage = CombatResolver.scaled_monster_damage(def.damage, effective_tier)
@@ -58,6 +63,7 @@ func _build() -> void:
 
 	_visual = _make_body()
 	add_child(_visual)
+	_ground_visual(_visual)
 	_anim = AssetLibrary.first_animation_player(_visual)
 	AssetLibrary.play_if_has(_anim, "idle")
 
@@ -74,13 +80,7 @@ func _build() -> void:
 	_agent.radius = 0.4
 	add_child(_agent)
 
-	var label := Label3D.new()
-	label.text = def.display_name if def else "Monster"
-	label.position = Vector3(0, 1.85 * (def.scale.y if def else 1.0), 0)
-	label.font_size = 28
-	label.modulate = Color(1, 0.9, 0.75)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	add_child(label)
+	_build_health_bar()
 
 
 func _physics_process(delta: float) -> void:
@@ -122,6 +122,7 @@ func _update_state() -> void:
 	var dist := global_position.distance_to(_player.global_position)
 	if dist <= def.attack_range:
 		state = State.ATTACK
+		_hp_timer = maxf(_hp_timer, 0.4)
 	elif dist <= def.detect_range or (state == State.CHASE and dist <= def.lose_range):
 		state = State.CHASE
 	else:
@@ -168,12 +169,21 @@ func receive_hit(raw_damage: float, from: Vector3, already_mitigated: bool) -> v
 		return
 	var dmg := raw_damage if already_mitigated else CombatResolver.mitigated_damage(raw_damage, 4.0)
 	health -= dmg
-	var push := global_position - from
+	var origin := global_position if is_inside_tree() else position
+	var push := origin - from
 	push.y = 0
 	if push.length() > 0.01:
-		global_position += push.normalized() * 0.25
+		var knock := push.normalized() * 0.25
+		if is_inside_tree():
+			global_position += knock
+		else:
+			position += knock
 	if _player:
 		state = State.CHASE
+	_hit_lock = 0.38
+	_hp_timer = 2.2
+	_refresh_health_bar()
+	AssetLibrary.play_if_has(_anim, "hit")
 	if health <= 0.0:
 		_die()
 
@@ -187,7 +197,7 @@ func _die() -> void:
 		tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.28)
 		tween.tween_callback(queue_free)
 		return
-	var timer := get_tree().create_timer(0.45)
+	var timer := get_tree().create_timer(1.15)
 	timer.timeout.connect(queue_free)
 
 
@@ -195,7 +205,8 @@ func _make_body() -> Node3D:
 	var authored := AssetLibrary.instance(AssetLibrary.monster_path(def.id if def else &"skeleton"))
 	if authored:
 		authored.name = "BodyVisual"
-		authored.scale = def.scale if def else Vector3.ONE
+		var uniform := def.scale.y if def else 1.0
+		authored.scale = Vector3.ONE * uniform
 		_paint_creature(authored)
 		return authored
 	var fallback := Greybox.make_capsule_visual(0.38, 1.5, def.color if def else Color.RED)
@@ -239,6 +250,8 @@ func _mat_for_part(part_name: String) -> StandardMaterial3D:
 
 
 func _paint_named(node: Node) -> void:
+	if String(node.name) == "HealthBar":
+		return
 	if node is MeshInstance3D:
 		(node as MeshInstance3D).material_override = _mat_for_part(String(node.name))
 		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -247,7 +260,13 @@ func _paint_named(node: Node) -> void:
 
 
 func _update_visual(delta: float) -> void:
+	if _hp_timer > 0.0:
+		_hp_timer = maxf(0.0, _hp_timer - delta)
+		_refresh_health_bar()
 	if _visual == null:
+		return
+	if _hit_lock > 0.0:
+		_hit_lock = maxf(0.0, _hit_lock - delta)
 		return
 	match state:
 		State.PATROL:
@@ -266,7 +285,9 @@ func _update_visual(delta: float) -> void:
 
 
 func _pick_patrol() -> void:
-	var stream: GameRNG = GameSession.ai_rng if GameSession and GameSession.ai_rng else GameRNG.new(1)
+	var stream: GameRNG = _session_ai_rng()
+	if stream == null:
+		stream = GameRNG.new(1)
 	patrol_target = home + Vector3(
 		stream.randf_range(-3.5, 3.5),
 		0,
@@ -274,8 +295,110 @@ func _pick_patrol() -> void:
 	)
 
 
+func _session_ai_rng() -> GameRNG:
+	# Node lookup so this class_name compiles under `godot -s` before autoload names exist.
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	var session := tree.root.get_node_or_null("GameSession")
+	if session == null:
+		return null
+	var rng: Variant = session.get("ai_rng")
+	return rng as GameRNG if rng is GameRNG else null
+
+
 func _find_player() -> Node3D:
 	var players := get_tree().get_nodes_in_group("player")
 	if players.is_empty():
 		return null
 	return players[0]
+
+
+func _build_health_bar() -> void:
+	_hp_root = Node3D.new()
+	_hp_root.name = "HealthBar"
+	_hp_root.visible = false
+	var height := 1.82 * (def.scale.y if def else 1.0)
+	if def and String(def.id) == "cave_wolf":
+		height = 1.05
+	elif def and String(def.id) == "cave_troll":
+		height = 2.35
+	_hp_root.position = Vector3(0, height, 0)
+	add_child(_hp_root)
+	var bg := MeshInstance3D.new()
+	bg.name = "HealthBarBg"
+	var bg_mesh := QuadMesh.new()
+	bg_mesh.size = Vector2(0.55, 0.055)
+	bg.mesh = bg_mesh
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.albedo_color = Color(0.08, 0.06, 0.05, 0.7)
+	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	bg_mat.no_depth_test = true
+	bg.material_override = bg_mat
+	_hp_root.add_child(bg)
+	_hp_fill = MeshInstance3D.new()
+	_hp_fill.name = "HealthBarFill"
+	var fill_mesh := QuadMesh.new()
+	fill_mesh.size = Vector2(0.52, 0.038)
+	_hp_fill.mesh = fill_mesh
+	_hp_fill.position = Vector3(0, 0, 0.002)
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill_mat.albedo_color = Color(0.72, 0.18, 0.16, 0.9)
+	fill_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fill_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	fill_mat.no_depth_test = true
+	_hp_fill.material_override = fill_mat
+	_hp_root.add_child(_hp_fill)
+
+
+func _refresh_health_bar() -> void:
+	if _hp_root == null:
+		return
+	_hp_root.visible = _hp_timer > 0.0 and state != State.DEAD
+	if _hp_fill == null:
+		return
+	var ratio := clampf(health / maxf(1.0, max_health), 0.0, 1.0)
+	_hp_fill.scale = Vector3(ratio, 1.0, 1.0)
+	_hp_fill.position.x = -0.26 * (1.0 - ratio)
+
+
+func _ground_visual(root: Node3D) -> void:
+	var aabb := _local_aabb(root)
+	if aabb.size.y < 0.05:
+		return
+	root.position.y -= aabb.position.y
+
+
+func _local_aabb(root: Node) -> AABB:
+	var points: Array = []
+	_collect_mesh_points(root, root, points)
+	if points.is_empty():
+		return AABB()
+	var result := AABB(points[0], Vector3.ZERO)
+	for p in points:
+		result = result.expand(p)
+	return result
+
+
+func _collect_mesh_points(root: Node, node: Node, points: Array) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		var xf := _relative_xform(root, mi)
+		var local := mi.get_aabb()
+		for i in 8:
+			points.append(xf * local.get_endpoint(i))
+	for child in node.get_children():
+		_collect_mesh_points(root, child, points)
+
+
+func _relative_xform(root: Node, node: Node3D) -> Transform3D:
+	var xf := node.transform
+	var p := node.get_parent()
+	while p != null and p != root:
+		if p is Node3D:
+			xf = (p as Node3D).transform * xf
+		p = p.get_parent()
+	return xf
