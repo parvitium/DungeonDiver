@@ -126,7 +126,10 @@ func _refresh_ui() -> void:
 	actions.add_child(_btn("Open pack (I)", _open_inv))
 	actions.add_child(_btn("Bestiary (B)", _open_bestiary))
 	actions.add_child(_btn("Save", func() -> void: SaveService.save_game()))
-	actions.add_child(_btn("Load", func() -> void: SaveService.load_game(); _refresh_ui()))
+	actions.add_child(_btn("Load", func() -> void:
+		SaveService.load_game()
+		_refresh_ui()
+	))
 	actions.add_child(_btn("New game", _new_game))
 
 	var inv := preload("res://src/ui/inventory_panel.gd").new()

@@ -1,5 +1,6 @@
 extends Node
 ## Loads built-in catalog plus any extra resources dropped in res://data/.
+## Extra .tres files are class-checked and field-validated before insert.
 
 var items: Dictionary = {}
 var monsters: Dictionary = {}
@@ -24,10 +25,11 @@ func reload() -> void:
 		dungeons[String(def.id)] = def
 	for def in Catalog.all_loot_tables():
 		loot_tables[String(def.id)] = def
-	_load_extra("res://data/items", items)
-	_load_extra("res://data/monsters", monsters)
-	_load_extra("res://data/dungeons", dungeons)
-	_load_extra("res://data/loot_tables", loot_tables)
+	_load_extra("res://data/items", items, &"item")
+	_load_extra("res://data/monsters", monsters, &"monster")
+	_load_extra("res://data/dungeons", dungeons, &"dungeon")
+	_load_extra("res://data/loot_tables", loot_tables, &"loot_table")
+	_offer_unlisted_items()
 
 
 func get_item(id: StringName) -> ItemDef:
@@ -62,7 +64,31 @@ func dungeon_ids() -> PackedStringArray:
 	return ids
 
 
-func _load_extra(dir_path: String, dest: Dictionary) -> void:
+func item_is_on_a_table(item_id: StringName) -> bool:
+	var key := String(item_id)
+	for table in loot_tables.values():
+		if table is LootTable:
+			for listed in table.item_ids:
+				if listed == key:
+					return true
+	return false
+
+
+func accepts_extra(resource: Variant, kind: StringName) -> bool:
+	match kind:
+		&"item":
+			return ItemDef.is_valid_extra(resource)
+		&"monster":
+			return MonsterDef.is_valid_extra(resource)
+		&"dungeon":
+			return DungeonTypeDef.is_valid_extra(resource)
+		&"loot_table":
+			return LootTable.is_valid_extra(resource)
+		_:
+			return false
+
+
+func _load_extra(dir_path: String, dest: Dictionary, kind: StringName) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
 		return
@@ -71,7 +97,24 @@ func _load_extra(dir_path: String, dest: Dictionary) -> void:
 	while file_name != "":
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var resource := load("%s/%s" % [dir_path, file_name])
-			if resource != null and resource.get("id") != null:
+			if accepts_extra(resource, kind):
 				dest[String(resource.id)] = resource
+			elif resource != null:
+				push_warning("Skipping %s/%s: not a valid %s" % [dir_path, file_name, String(kind)])
 		file_name = dir.get_next()
 	dir.list_dir_end()
+
+
+func _offer_unlisted_items() -> void:
+	var extras: PackedStringArray = []
+	for item_id in items.keys():
+		if not item_is_on_a_table(StringName(item_id)):
+			extras.append(String(item_id))
+	if extras.is_empty():
+		return
+	var table: LootTable = get_loot_table(&"mixed_drops")
+	if table == null:
+		return
+	for extra_id in extras:
+		table.item_ids.append(extra_id)
+		table.weights.append(12.0)

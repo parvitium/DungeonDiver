@@ -29,8 +29,8 @@ Autoload order: `ContentDB` → `GameSession` → `SaveService`.
 
 ## Invariants
 
-1. **GameSession is the authority.** Profile, run seed, loot grants, kills, and clears go through it. Do not write progression from UI widgets except via inventory helpers + `profile_changed`.
-2. **Input is a command.** `Player.gather_command()` reads Godot input; `Player.apply_command()` is the part a future host should run. Do not sprinkle `Input.is_action_*` inside combat math.
+1. **GameSession is the authority.** Profile, run seed, loot grants, kills, clears, the command inbox, and the seeded RNG go through it. Do not write progression from UI widgets except via inventory helpers + `profile_changed`.
+2. **Input is a command.** `Player.gather_command()` reads Godot input and **submits** it with `GameSession.submit_command`. `GameSession.tick` applies the inbox via `Player.apply_command`. Do not call `apply_command` from `_physics_process`, and do not sprinkle `Input.is_action_*` inside combat math. Set `GameSession.accept_local_input = false` when injecting host/remote commands.
 3. **Content is data.** New dungeon/monster/item = Resource + catalog or `data/*.tres`. Do not hard-code type lists in UI; iterate `ContentDB`.
 4. **Scaling is centralized.** `DD.effective_tier`, `DD.depth_scale`, `DD.rarity_weights_for_tier`, `LootGenerator`, `CombatResolver.scaled_monster_*`. If a number changes with depth, it belongs there so tests can lock it.
 5. **Greybox is disposable.** Visual nodes are named `BodyVisual` / `WeaponVisual` / `ShieldVisual` or tagged `asset_socket`. Simulation must not depend on mesh shape beyond collision the builder already creates.
@@ -45,7 +45,7 @@ Autoload order: `ContentDB` → `GameSession` → `SaveService`.
 5. Boss death unlocks the exit. Exit or death/abandon calls `GameSession.end_run`.
 6. Victory records `progression.record_clear`. Any kill records bestiary.
 
-Save file: `user://dungeondiver_save.json`, versioned by `DD.SAVE_VERSION`.
+Save file: `user://dungeondiver_save.json`, versioned by `DD.SAVE_VERSION`. Load type-checks every nested field, drops unknown catalog ids, rejects newer versions, and never assigns a half-decoded profile. Corrupt files are copied to `<save>.corrupt-<unix>` and the session starts fresh.
 
 ## Tests
 
@@ -59,6 +59,6 @@ See `docs/multiplayer-plan.md`. Do not add RPCs until that plan is being execute
 
 ## Godot notes
 
-- Physics layers: world 1, player 2, monster 3, projectile 4, interactable 5.
+- Physics layers: world 1, player 2, monster 3, projectile 4, interactable 5, hurtbox 6 (`DD.HURTBOX_LAYER`, unused in this slice).
 - Project feature set: 4.7 Forward Plus.
 - First import writes `.godot/` (gitignored). CI imports fresh.

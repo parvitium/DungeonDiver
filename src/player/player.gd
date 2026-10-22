@@ -148,8 +148,9 @@ func apply_command(cmd: PlayerCommand, delta: float) -> void:
 	vitals_changed.emit()
 
 
-func _physics_process(delta: float) -> void:
-	apply_command(gather_command(), delta)
+func _physics_process(_delta: float) -> void:
+	if GameSession.accept_local_input:
+		GameSession.submit_command(gather_command())
 
 
 func _apply_look(look_delta: Vector2) -> void:

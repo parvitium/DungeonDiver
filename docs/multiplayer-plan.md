@@ -1,28 +1,36 @@
-# Co-op plan (not implemented)
+# Co-op plan
 
-DungeonDiver should stay **host-authoritative**. The prototype already splits “what the player wants” from “what the world does” so this phase can add networking without rewriting combat.
+DungeonDiver is **host-authoritative** when co-op is added. Networking is **not** implemented. This document describes what the prototype actually does today, then how Phase 3 should use that split.
 
-## Goals
+## What exists now (prototype)
+
+These pieces are wired and tested. Do not describe them as more than this.
+
+| Piece | What it does today |
+| --- | --- |
+| `PlayerCommand` | One tick of intent (move, look, jump, sprint, melee, block, cast, interact). `to_dict` / `from_dict` for later RPCs. |
+| `Player.gather_command()` | Reads Godot `Input` + mouse look on the local pawn. |
+| `GameSession` command inbox | `Player._physics_process` calls `GameSession.submit_command(gather_command())` when `accept_local_input` is true. It does **not** apply the command itself. |
+| `GameSession.tick(delta)` | Runs on the session's physics tick (`process_priority` 20, after pawns). Drains the inbox and calls `Player.apply_command(cmd, delta)` on the first `"player"` node. Tests call `tick` directly. |
+| `Player.apply_command` | The only pawn step. Host (and today's solo session) run this. |
+| `GameSession.rng` | A `GameRNG` wrapping a seeded `RandomNumberGenerator`. `start_run` reseeds it from `run.seed_value`. Loot (`roll_table`), monster drop chance, and patrol picks use this stream. `CombatResolver` stays pure math; any combat roll goes through `GameSession.rng`. |
+| Determinism | Same `seed_value` + same `PlayerCommand` sequence + same `roll_table` / `randf` order produces the same loot and rolls (`tests/test_command.gd`). |
+| `ContentDB` | Shared defs. Extra `.tres` files are class-checked (`is ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable`) and field-validated before insert. |
+| Entity ids on items/monsters | Spawn keys (`GameRNG.next_id`). |
+| `CombatResolver` / `LootGenerator` | Pure functions. Session supplies the RNG. No `multiplayer.is_server()` inside them. |
+
+Solo play already goes through the inbox. There is no ENet peer, no RPC, no listen server, no snapshot replication.
+
+Set `GameSession.accept_local_input = false` when a future host is applying remote commands so the pawn does not also submit local `Input`.
+
+## Goals (not built)
 
 - 2–4 players in one generated dungeon
 - One host (listen-server) owns `GameSession`, RNG, hits, loot, and clears
-- Clients send intent only; they do not spawn loot or record bestiary locally
+- Clients send `PlayerCommand` only; they do not spawn loot or record bestiary locally
 - Same content defs on every peer (catalog + `data/*.tres` must match)
 
-## What already exists for this
-
-| Piece | Role later |
-| --- | --- |
-| `PlayerCommand` | Serialized input tick (move, look, buttons) |
-| `Player.apply_command` | Host-run pawn step |
-| `GameRNG` + run seed | Host picks seed; all generation is deterministic from it |
-| `GameSession` | Becomes the host singleton; clients get snapshots / RPCs |
-| Entity ids on items/monsters | Replicated spawn keys |
-| `CombatResolver` / `LootGenerator` | Run only on host |
-
-Do **not** put `multiplayer.is_server()` checks inside `CombatResolver` or `Catalog`. Keep those pure.
-
-## Recommended Godot stack
+## Recommended Godot stack (Phase 3)
 
 - High-level multiplayer (`ENetMultiplayerPeer` first; Steam/EOS later if wanted)
 - `MultiplayerSpawner` for player pawns and monsters *after* the host builds the dungeon
@@ -31,36 +39,37 @@ Do **not** put `multiplayer.is_server()` checks inside `CombatResolver` or `Cata
 
 Avoid replicating every `CharacterBody3D` property. Replicate:
 
-1. Commands (client → host)
+1. Commands (client → host inbox)
 2. Transform + vitals + state enum (host → clients)
 3. Discrete events: spawn, die, loot drop, door unlock, run end
 
-## Session flow
+## Session flow (Phase 3)
 
 1. Host opens a listen server from the hub. Clients join with a name.
 2. Host keeps one `PlayerProfile` per peer (inventory is per-player).
 3. Party selects dungeon + depth. Host calls `start_run` once, replicates the seed and dungeon id. Everyone builds the same `DungeonBlueprint` locally **or** host builds and spawns; prefer **shared seed + local build** for greybox geometry to cut spawn traffic.
 4. Host spawns monsters with ids. Clients instance ghosts keyed by those ids.
-5. On kill, host updates that peer’s bestiary and rolls loot. Drops are world entities with ids; any player can interact; host grants the item to that profile.
+5. On kill, host updates that peer’s bestiary and rolls loot from `GameSession.rng`. Drops are world entities with ids; any player can interact; host grants the item to that profile.
 6. Exit: host requires boss dead, then `end_run(true)` for all, writing each profile’s conquest if they were present.
 
-## Authority rules
+## Authority rules (Phase 3)
 
 - Hits: only host calls `receive_hit` for real damage. Clients may play swings immediately (prediction) but health is host-corrected.
 - Stamina/health: host sim; clients interpolate bars.
 - Inventory/equip: request RPC → host mutates `Inventory` → replicate bag snapshot.
 - Save: each client saves its own profile; host does not write other people’s disks.
 
-## What not to do in Phase 1
+## What not to do until Phase 3 starts
 
-- No `rpc()` on player or monster yet (avoids half-wired net)
+- No `rpc()` on player or monster (avoids half-wired net)
 - No lobby backend, relay, or paid service
 - No client-side loot generation
+- Do not put `multiplayer.is_server()` inside `CombatResolver` or `Catalog`
 
 ## First implementation slice (when we start Phase 3)
 
 1. Listen server + join from hub, spawn extra `Player` pawns
-2. Route remote peers through `PlayerCommand.from_dict`
+2. Route remote peers through `PlayerCommand.from_dict` → `GameSession.submit_command`
 3. Replicate monster health/deaths
 4. Shared exit / wipe handling
 5. Only then: drop-in, voice-adjacent UI, more than two players

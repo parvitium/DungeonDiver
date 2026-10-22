@@ -33,6 +33,10 @@ const DOOR_WIDTH := 2.8
 const DOOR_HEIGHT := 3.0
 
 
+static func is_number(value: Variant) -> bool:
+	return value is int or value is float
+
+
 static func rarity_name(rarity: int) -> String:
 	if rarity < 0 or rarity >= RARITY_NAMES.size():
 		return "Unknown"

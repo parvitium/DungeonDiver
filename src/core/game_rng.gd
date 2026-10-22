@@ -15,6 +15,14 @@ func reseed(p_seed: int) -> void:
 	_rng.seed = seed_value
 
 
+func engine() -> RandomNumberGenerator:
+	return _rng
+
+
+func next_id(prefix: String = "id") -> String:
+	return "%s_%d_%d" % [prefix, seed_value, _rng.randi()]
+
+
 func randf() -> float:
 	return _rng.randf()
 

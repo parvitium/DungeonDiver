@@ -17,3 +17,18 @@ extends Resource
 @export var accent_color: Color = Color(0.55, 0.35, 0.75)
 @export var fog_color: Color = Color(0.05, 0.04, 0.06)
 @export var light_color: Color = Color(0.75, 0.55, 1.0)
+
+
+static func is_valid_extra(resource: Variant) -> bool:
+	if not resource is DungeonTypeDef:
+		return false
+	var def: DungeonTypeDef = resource
+	if String(def.id).is_empty() or def.display_name.is_empty():
+		return false
+	if def.min_rooms < 1 or def.max_rooms < def.min_rooms:
+		return false
+	if def.base_tier < 1:
+		return false
+	if String(def.boss_id).is_empty():
+		return false
+	return true

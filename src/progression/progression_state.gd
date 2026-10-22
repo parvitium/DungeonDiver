@@ -60,6 +60,20 @@ func conquered_count(known_dungeon_ids: PackedStringArray) -> int:
 	return count
 
 
+func drop_unknown_ids(monster_defs: Dictionary, dungeon_defs: Dictionary) -> void:
+	var kept_bestiary: Dictionary = {}
+	for key in bestiary.keys():
+		if monster_defs.has(String(key)):
+			kept_bestiary[key] = bestiary[key]
+	bestiary = kept_bestiary
+	var kept_conquered: Dictionary = {}
+	for key in conquered.keys():
+		if dungeon_defs.has(String(key)):
+			kept_conquered[key] = conquered[key]
+	conquered = kept_conquered
+	changed.emit()
+
+
 func to_dict() -> Dictionary:
 	return {
 		"bestiary": bestiary.duplicate(true),
@@ -67,12 +81,38 @@ func to_dict() -> Dictionary:
 	}
 
 
-static func from_dict(data: Dictionary) -> ProgressionState:
+static func from_dict(data: Variant) -> ProgressionState:
+	if data == null:
+		return ProgressionState.new()
+	if not data is Dictionary:
+		return null
+	var dict: Dictionary = data
+	if dict.has("bestiary") and not dict["bestiary"] is Dictionary:
+		return null
+	if dict.has("conquered") and not dict["conquered"] is Dictionary:
+		return null
 	var state := ProgressionState.new()
-	var raw_bestiary: Variant = data.get("bestiary", {})
+	var raw_bestiary: Variant = dict.get("bestiary", {})
 	if raw_bestiary is Dictionary:
-		state.bestiary = raw_bestiary.duplicate(true)
-	var raw_conquered: Variant = data.get("conquered", {})
+		var bestiary_copy: Dictionary = {}
+		for key in raw_bestiary.keys():
+			var entry: Variant = raw_bestiary[key]
+			if not entry is Dictionary:
+				return null
+			var entry_dict: Dictionary = entry
+			if entry_dict.has("kills") and not DD.is_number(entry_dict["kills"]):
+				return null
+			if entry_dict.has("first_unix") and not DD.is_number(entry_dict["first_unix"]):
+				return null
+			bestiary_copy[String(key)] = entry_dict.duplicate(true)
+		state.bestiary = bestiary_copy
+	var raw_conquered: Variant = dict.get("conquered", {})
 	if raw_conquered is Dictionary:
-		state.conquered = raw_conquered.duplicate(true)
+		var conquered_copy: Dictionary = {}
+		for key in raw_conquered.keys():
+			var depth: Variant = raw_conquered[key]
+			if not DD.is_number(depth):
+				return null
+			conquered_copy[String(key)] = int(depth)
+		state.conquered = conquered_copy
 	return state

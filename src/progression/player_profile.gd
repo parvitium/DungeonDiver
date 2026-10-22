@@ -65,12 +65,31 @@ func to_dict() -> Dictionary:
 	}
 
 
-static func from_dict(data: Dictionary) -> PlayerProfile:
+static func from_dict(data: Variant) -> PlayerProfile:
+	if not data is Dictionary:
+		return null
+	var dict: Dictionary = data
+	if dict.has("display_name") and not dict["display_name"] is String:
+		return null
+	if dict.has("current_health") and not DD.is_number(dict["current_health"]):
+		return null
+	if dict.has("current_stamina") and not DD.is_number(dict["current_stamina"]):
+		return null
+	if dict.has("inventory") and not dict["inventory"] is Dictionary:
+		return null
+	if dict.has("progression") and not dict["progression"] is Dictionary:
+		return null
+	var inventory := Inventory.from_dict(dict.get("inventory", {}))
+	if inventory == null:
+		return null
+	var progression := ProgressionState.from_dict(dict.get("progression", {}))
+	if progression == null:
+		return null
 	var profile := PlayerProfile.new()
-	profile.display_name = str(data.get("display_name", "Diver"))
-	profile.inventory = Inventory.from_dict(data.get("inventory", {}))
-	profile.progression = ProgressionState.from_dict(data.get("progression", {}))
-	profile.current_health = float(data.get("current_health", BASE_HEALTH))
-	profile.current_stamina = float(data.get("current_stamina", BASE_STAMINA))
+	profile.display_name = str(dict.get("display_name", "Diver"))
+	profile.inventory = inventory
+	profile.progression = progression
+	profile.current_health = float(dict.get("current_health", BASE_HEALTH))
+	profile.current_stamina = float(dict.get("current_stamina", BASE_STAMINA))
 	profile.clamp_vitals()
 	return profile

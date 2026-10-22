@@ -98,13 +98,50 @@ func to_dict() -> Dictionary:
 	return {"items": bag, "equipped": wear}
 
 
-static func from_dict(data: Dictionary) -> Inventory:
+func drop_unknown_items(item_defs: Dictionary) -> void:
+	var kept: Array[ItemInstance] = []
+	for item in items:
+		if item != null and item_defs.has(String(item.def_id)):
+			kept.append(item)
+	items = kept
+	for i in equipped.size():
+		var worn: Variant = equipped[i]
+		if worn != null and not item_defs.has(String(worn.def_id)):
+			equipped[i] = null
+	changed.emit()
+
+
+static func from_dict(data: Variant) -> Inventory:
+	if data == null:
+		return Inventory.new()
+	if not data is Dictionary:
+		return null
+	var dict: Dictionary = data
+	if dict.has("items") and not dict["items"] is Array:
+		return null
+	if dict.has("equipped") and not dict["equipped"] is Array:
+		return null
 	var inv := Inventory.new()
-	for entry in data.get("items", []):
-		if entry is Dictionary:
-			inv.items.append(ItemInstance.from_dict(entry))
-	var wear: Array = data.get("equipped", [])
+	var bag: Variant = dict.get("items", [])
+	if not bag is Array:
+		return null
+	for entry in bag:
+		if not entry is Dictionary:
+			return null
+		var item := ItemInstance.from_dict(entry)
+		if item == null:
+			return null
+		inv.items.append(item)
+	var wear: Variant = dict.get("equipped", [])
+	if not wear is Array:
+		return null
 	for i in mini(SLOT_COUNT, wear.size()):
-		if wear[i] is Dictionary:
-			inv.equipped[i] = ItemInstance.from_dict(wear[i])
+		if wear[i] == null:
+			continue
+		if not wear[i] is Dictionary:
+			return null
+		var worn := ItemInstance.from_dict(wear[i])
+		if worn == null:
+			return null
+		inv.equipped[i] = worn
 	return inv

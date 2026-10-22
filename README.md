@@ -7,7 +7,7 @@ This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Roo
 ## Requirements
 
 - [Godot 4.7.x](https://godotengine.org/download/linux/) (4.7.2 used in CI)
-- No paid assets or services. All art in this slice is self-made greybox (public domain / CC0 as part of the repo).
+- No paid assets or services. Code is MIT; art/greybox is original / self-made CC0. See [`LICENSE`](LICENSE).
 
 ## How to run
 
@@ -51,7 +51,7 @@ Hub: click a dungeon card to select it, click again to enter at the chosen depth
 - Five monster definitions (skeleton, cave wolf, wraith, crypt lich, cave troll) with patrol / chase / attack
 - Item model with rarity tiers and dungeon-tier scaling, inventory + equip UI
 - Bestiary and dungeon-conquered log, JSON save/load (`user://dungeondiver_save.json`)
-- Authoritative session + `PlayerCommand` so input stays separable from simulation
+- Authoritative `GameSession`: local input becomes a `PlayerCommand` in the session inbox; the session applies it on its tick and owns a seeded `RandomNumberGenerator` for loot/combat rolls
 
 ## Placeholder vs real content
 
@@ -65,4 +65,9 @@ Everything you see is a primitive: boxes, capsules, and colored lights. Sockets 
 
 ## Adding content
 
-Drop a `ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable` `.tres` into `data/`. `ContentDB` merges those on top of the built-in catalog in `src/content/catalog.gd`.
+Drop a `ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable` `.tres` into `data/`. `ContentDB` class-checks and field-validates extras, then merges them on top of the built-in catalog in `src/content/catalog.gd`. Items that are not on any loot table are added to `mixed_drops` so they can drop in play (`ashen_circlet` is the shipped example).
+
+## License
+
+- **Code** — MIT ([`LICENSE`](LICENSE))
+- **Assets** — original / self-made, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)

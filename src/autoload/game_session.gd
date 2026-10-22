@@ -1,6 +1,6 @@
 extends Node
-## Authoritative session: profile + current run. Presentation reads this.
-## Future host will own this node; clients will send PlayerCommand only.
+## Authoritative session: profile, run, command inbox, and seeded RNG.
+## Player submits PlayerCommand; this node applies it on its physics tick.
 
 signal profile_changed
 signal run_started
@@ -10,18 +10,47 @@ signal log_message(text: String, color: Color)
 var profile: PlayerProfile = PlayerProfile.new()
 var run: DungeonRunState = null
 var ui_open: bool = false
+var accept_local_input: bool = true
+## Seeded wrapper around RandomNumberGenerator. Loot and combat rolls use this.
+var rng: GameRNG = GameRNG.new(1)
+
+var _command_inbox: Array[PlayerCommand] = []
 
 
 func _ready() -> void:
+	process_priority = 20
 	reset_profile(false)
 
 
 func reset_profile(emit_change: bool = true) -> void:
 	profile = PlayerProfile.new()
-	var rng := GameRNG.new(1)
+	rng = GameRNG.new(1)
+	_command_inbox.clear()
 	profile.grant_starter_kit(ContentDB.items, rng)
 	if emit_change:
 		profile_changed.emit()
+
+
+func submit_command(cmd: PlayerCommand) -> void:
+	if cmd == null:
+		return
+	_command_inbox.append(cmd)
+
+
+func pending_command_count() -> int:
+	return _command_inbox.size()
+
+
+func tick(delta: float) -> void:
+	var pawn := _find_player()
+	for cmd in _command_inbox:
+		if pawn != null and pawn.has_method("apply_command"):
+			pawn.apply_command(cmd, delta)
+	_command_inbox.clear()
+
+
+func _physics_process(delta: float) -> void:
+	tick(delta)
 
 
 func start_run(dungeon_id: StringName, depth: int, seed_value: int = 0) -> DungeonRunState:
@@ -37,6 +66,8 @@ func start_run(dungeon_id: StringName, depth: int, seed_value: int = 0) -> Dunge
 	run.seed_value = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
 	run.blueprint = DungeonGenerator.generate(def, run.depth, run.seed_value)
 	run.blueprint.effective_tier = run.effective_tier
+	rng = GameRNG.new(run.seed_value)
+	_command_inbox.clear()
 	run_started.emit()
 	log_message.emit("Entered %s (depth %d)." % [def.display_name, run.depth], Color(0.85, 0.75, 0.45))
 	return run
@@ -51,6 +82,7 @@ func end_run(victory: bool) -> void:
 	else:
 		log_message.emit("Retreated to the surface.", Color(0.9, 0.55, 0.4))
 	run = null
+	_command_inbox.clear()
 	profile.refill()
 	profile_changed.emit()
 	run_ended.emit(victory)
@@ -73,5 +105,24 @@ func roll_table(table_id: StringName) -> Array[ItemInstance]:
 	if run == null:
 		return []
 	var table: LootTable = ContentDB.get_loot_table(table_id)
-	var rng := GameRNG.new(run.seed_value + int(Time.get_ticks_usec() % 997))
 	return LootGenerator.generate_from_table(table, ContentDB.items, run.effective_tier, rng)
+
+
+func randf() -> float:
+	return rng.randf()
+
+
+func engine_rng() -> RandomNumberGenerator:
+	return rng.engine()
+
+
+func _find_player() -> Node:
+	if not is_inside_tree():
+		return null
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var players := tree.get_nodes_in_group("player")
+	if players.is_empty():
+		return null
+	return players[0]

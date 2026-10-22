@@ -45,4 +45,20 @@ static func run() -> DDTest:
 		t.assert_eq(table.item_ids.size(), table.weights.size(), "%s weights align" % String(table.id))
 		for item_id in table.item_ids:
 			t.assert_true(item_ids.has(item_id), "table item %s exists" % item_id)
+
+	var db := DDTest.autoload("ContentDB")
+	var dummy_table := LootTable.new()
+	dummy_table.id = &"sneaky"
+	dummy_table.item_ids = PackedStringArray(["rusty_sword"])
+	dummy_table.weights = PackedFloat32Array([1.0])
+	t.assert_false(db.accepts_extra(dummy_table, &"item"), "loot table is not an item")
+	t.assert_true(db.accepts_extra(dummy_table, &"loot_table"), "valid loot table")
+	var blank_item := ItemDef.new()
+	t.assert_false(db.accepts_extra(blank_item, &"item"), "item needs id and name")
+	var relic: ItemDef = db.get_item(&"ashen_circlet")
+	t.assert_true(relic != null, "ashen_circlet loaded from data/items")
+	t.assert_true(ItemDef.is_valid_extra(relic), "ashen_circlet field-valid")
+	t.assert_true(db.item_is_on_a_table(&"ashen_circlet"), "ashen_circlet obtainable")
+	t.assert_true(db.accepts_extra(relic, &"item"), "ashen_circlet accepted as item")
+	t.assert_false(db.accepts_extra(relic, &"monster"), "item is not a monster")
 	return t

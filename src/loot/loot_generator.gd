@@ -17,7 +17,7 @@ static func scale_multiplier(rarity: int, effective_tier: int) -> float:
 static func make_item(def: ItemDef, effective_tier: int, rng: GameRNG) -> ItemInstance:
 	var rarity := roll_rarity(rng, effective_tier, int(def.min_rarity), int(def.max_rarity))
 	var item := ItemInstance.new()
-	item.instance_id = DD.new_id("item")
+	item.instance_id = rng.next_id("item")
 	item.def_id = def.id
 	item.display_name = def.display_name
 	item.slot = def.slot

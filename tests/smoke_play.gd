@@ -25,8 +25,9 @@ func _ready() -> void:
 	var start := player.global_position
 	var move_cmd := PlayerCommand.new()
 	move_cmd.move = Vector2(0, -1)
-	player.apply_command(move_cmd, 0.05)
-	failed += _check(player.global_position.distance_to(start) > 0.05, "command moves pawn")
+	GameSession.submit_command(move_cmd)
+	GameSession.tick(0.05)
+	failed += _check(player.global_position.distance_to(start) > 0.05, "session inbox moves pawn")
 
 	var mob := Monster.new()
 	var monster_def: MonsterDef = ContentDB.get_monster(&"skeleton")

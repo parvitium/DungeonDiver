@@ -15,22 +15,33 @@ const TestCommandScript := preload("res://tests/test_command.gd")
 
 func _initialize() -> void:
 	print("DungeonDiver tests starting")
+	_boot_autoloads()
 	var code := _run()
 	print("DungeonDiver tests finished with code %d" % code)
 	quit(code)
 
 
+func _boot_autoloads() -> void:
+	# `-s` SceneTree._initialize runs before autoload _ready. Load content first.
+	var content := root.get_node_or_null("ContentDB")
+	if content and content.has_method("reload"):
+		content.reload()
+	var session := root.get_node_or_null("GameSession")
+	if session and session.has_method("reset_profile"):
+		session.reset_profile(false)
+
+
 func _run() -> int:
 	var suites: Array = [
-		TestStatsScript.run(),
-		TestLootScript.run(),
-		TestCombatScript.run(),
-		TestInventoryScript.run(),
-		TestProgressionScript.run(),
-		TestDungeonGenScript.run(),
-		TestSaveScript.run(),
-		TestContentScript.run(),
-		TestCommandScript.run(),
+		_suite(TestStatsScript, "stats"),
+		_suite(TestLootScript, "loot"),
+		_suite(TestCombatScript, "combat"),
+		_suite(TestInventoryScript, "inventory"),
+		_suite(TestProgressionScript, "progression"),
+		_suite(TestDungeonGenScript, "dungeon_gen"),
+		_suite(TestSaveScript, "save"),
+		_suite(TestContentScript, "content"),
+		_suite(TestCommandScript, "command"),
 		_smoke(),
 	]
 
@@ -51,6 +62,12 @@ func _run() -> int:
 	print("----")
 	print("Total  %d passed  %d failed" % [passed, failed])
 	return 1 if failed > 0 else 0
+
+
+func _suite(script: GDScript, suite_name: String) -> DDTest:
+	if script == null or not script.has_method("run"):
+		return DDTest.compile_failure(suite_name, "suite script failed to compile")
+	return script.call("run")
 
 
 func _smoke() -> DDTest:

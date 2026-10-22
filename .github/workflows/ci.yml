@@ -11,6 +11,7 @@ env:
 jobs:
   headless-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +35,7 @@ jobs:
       - name: Import project
         run: |
           "${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
-            --headless --path . --import --quit || true
+            --headless --path . --import --quit
 
       - name: Run headless tests
         run: |
@@ -43,5 +44,10 @@ jobs:
 
       - name: Scene smoke
         run: |
-          "${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
-            --headless --path . --quit-after 20 res://tests/smoke_play.tscn
+          set -euo pipefail
+          GODOT="${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          OUT="${{ runner.temp }}/smoke.log"
+          # No --quit-after: a hang must fail. timeout is 124 on expiry.
+          timeout --signal=TERM --kill-after=5s 45s \
+            "$GODOT" --headless --path . res://tests/smoke_play.tscn | tee "$OUT"
+          grep -q "SMOKE_PLAY OK" "$OUT"

@@ -47,7 +47,9 @@ func refresh() -> void:
 		var kills := GameSession.profile.progression.kills_of(monster_id)
 		var title := def.display_name if kills > 0 else "???"
 		var extra := def.description if kills > 0 else "Not yet encountered."
-		var kind := "Boss" if def.is_boss else "Beast"
+		var kind := "???"
+		if kills > 0:
+			kind = "Boss" if def.is_boss else "Beast"
 		beast.add_child(ThemeFactory.label("%s  ·  %s  ·  %d slain" % [title, kind, kills], 15, Color(0.92, 0.86, 0.7) if kills > 0 else Color(0.45, 0.42, 0.38)))
 		beast.add_child(ThemeFactory.label(extra, 13, Color(0.65, 0.6, 0.5)))
 	cols.add_child(beast)

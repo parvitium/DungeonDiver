@@ -94,7 +94,7 @@ func _on_monster_died(monster: Monster) -> void:
 	_alive_monsters = maxi(0, _alive_monsters - 1)
 	GameSession.run.living_monsters = _alive_monsters
 	GameSession.record_kill(monster.def.id)
-	if monster.def.drop_chance >= 1.0 or GameRNG.new().randf() <= monster.def.drop_chance:
+	if monster.def.drop_chance >= 1.0 or GameSession.randf() <= monster.def.drop_chance:
 		var loot := GameSession.roll_table(monster.def.loot_table_id)
 		for item in loot:
 			var drop := LootDrop.new()
@@ -109,7 +109,12 @@ func _on_monster_died(monster: Monster) -> void:
 
 
 func _on_chest_opened(_by: Node, chest: Interactable) -> void:
-	var loot := GameSession.roll_table(&"chest_drops")
+	var table_id := &"chest_drops"
+	if GameSession.run != null:
+		var dungeon: DungeonTypeDef = ContentDB.get_dungeon(GameSession.run.dungeon_id)
+		if dungeon != null and not String(dungeon.loot_table_id).is_empty():
+			table_id = dungeon.loot_table_id
+	var loot := GameSession.roll_table(table_id)
 	for i in loot.size():
 		var drop := LootDrop.new()
 		add_child(drop)

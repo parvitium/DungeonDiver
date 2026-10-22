@@ -45,3 +45,16 @@ func assert_in_range(actual: float, lo: float, hi: float, message: String = "") 
 
 func _fmt(kind: String, message: String) -> String:
 	return "[%s] %s: %s" % [suite_name, kind, message]
+
+
+static func autoload(node_name: String) -> Node:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null(node_name)
+
+
+static func compile_failure(suite_name: String, detail: String) -> DDTest:
+	var t := DDTest.new(suite_name)
+	t.assert_true(false, detail)
+	return t

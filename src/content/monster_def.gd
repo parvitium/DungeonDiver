@@ -18,3 +18,18 @@ extends Resource
 @export var drop_chance: float = 0.7
 @export var color: Color = Color(0.7, 0.2, 0.2)
 @export var scale: Vector3 = Vector3.ONE
+
+
+static func is_valid_extra(resource: Variant) -> bool:
+	if not resource is MonsterDef:
+		return false
+	var def: MonsterDef = resource
+	if String(def.id).is_empty() or def.display_name.is_empty():
+		return false
+	if def.max_health <= 0.0 or def.damage < 0.0 or def.move_speed < 0.0:
+		return false
+	if def.attack_range < 0.0 or def.detect_range < 0.0:
+		return false
+	if def.drop_chance < 0.0 or def.drop_chance > 1.0:
+		return false
+	return true

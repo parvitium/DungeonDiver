@@ -59,13 +59,26 @@ func to_dict() -> Dictionary:
 	}
 
 
-static func from_dict(data: Dictionary) -> StatBlock:
+static func from_dict(data: Variant) -> StatBlock:
+	if data == null:
+		return StatBlock.new()
+	if not data is Dictionary:
+		return null
+	var dict: Dictionary = data
+	var values: Dictionary = {}
+	for key in ["attack", "defense", "max_health", "max_stamina", "spell_power"]:
+		if dict.has(key):
+			if not DD.is_number(dict[key]):
+				return null
+			values[key] = float(dict[key])
+		else:
+			values[key] = 0.0
 	return StatBlock.new(
-		float(data.get("attack", 0.0)),
-		float(data.get("defense", 0.0)),
-		float(data.get("max_health", 0.0)),
-		float(data.get("max_stamina", 0.0)),
-		float(data.get("spell_power", 0.0))
+		values["attack"],
+		values["defense"],
+		values["max_health"],
+		values["max_stamina"],
+		values["spell_power"]
 	)
 
 
