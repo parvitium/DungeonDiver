@@ -12,6 +12,9 @@ Playable solo loop that proves the fantasy:
 - [x] Bestiary + conquest log, save/load
 - [x] Authoritative session + command-shaped input
 - [x] Headless tests + GitHub Actions import/test
+- [x] Title / landing screen with cinematic hall and settings
+- [x] PBR dungeon kit, torches, props, AgX grading
+- [x] Authored monster meshes + first-person sword/shield
 - [ ] Feel pass (attack juice, hit react, audio)
 - [ ] Death/loot rules tuned with playtests
 

@@ -2,7 +2,7 @@
 
 First-person fantasy dungeon explorer. Fight monsters, take their gear, and keep going until every dungeon type and every monster type is in the book.
 
-This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Rooms are greybox primitives so Blender `.glb` meshes can replace them later. Co-op is designed for, not shipped — see [`docs/multiplayer-plan.md`](docs/multiplayer-plan.md).
+This repository is a **playable vertical-slice prototype** in **Godot 4.7**. The landing screen is a cinematic dungeon hall. Rooms use a PBR modular kit (Poly Haven CC0 textures + Blender-authored meshes) with swap sockets left intact. Co-op is designed for, not shipped — see [`docs/multiplayer-plan.md`](docs/multiplayer-plan.md).
 
 ## Requirements
 
@@ -13,8 +13,9 @@ This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Roo
 
 1. Install Godot 4.7.
 2. Open this folder as a project (`project.godot`).
-3. Press Play. The hub loads first.
-4. Pick **Forgotten Crypt** or **Howling Cavern**, choose depth 1–3, and enter.
+3. Press Play. The title / landing screen loads first.
+4. **Play** (or **Continue**) opens the hub. Pick **Forgotten Crypt** or **Howling Cavern**, choose depth 1–3, and enter.
+5. **Settings** covers mouse sensitivity, FOV, volume, and graphics quality (Low / Medium / High / Ultra).
 
 Headless tests (same command CI uses):
 
@@ -53,9 +54,9 @@ Hub: click a dungeon card to select it, click again to enter at the chosen depth
 - Bestiary and dungeon-conquered log, JSON save/load (`user://dungeondiver_save.json`)
 - Authoritative `GameSession`: local input becomes a `PlayerCommand` in the session inbox; the session applies it on its tick and owns a seeded `RandomNumberGenerator` for loot/combat rolls
 
-## Placeholder vs real content
+## Art
 
-Everything you see is a primitive: boxes, capsules, and colored lights. Sockets for future Blender exports are documented in [`assets/imported/README.md`](assets/imported/README.md). No Kenney / store packs are vendored.
+PBR stone / brick / wood / metal / ground maps are CC0 from [Poly Haven](https://polyhaven.com). Creatures, weapons, props, and kit pieces are original Blender meshes (`scripts/blender/generate_assets.py`). Every source is listed in [`assets/CREDITS.md`](assets/CREDITS.md). Visual nodes still use `BodyVisual` / `WeaponVisual` / `ShieldVisual` / `asset_socket` so a later kit can swap in. No paid or store packs.
 
 ## Docs
 

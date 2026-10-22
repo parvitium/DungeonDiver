@@ -11,6 +11,8 @@ const TestDungeonGenScript := preload("res://tests/test_dungeon_gen.gd")
 const TestSaveScript := preload("res://tests/test_save.gd")
 const TestContentScript := preload("res://tests/test_content.gd")
 const TestCommandScript := preload("res://tests/test_command.gd")
+const TestSettingsScript := preload("res://tests/test_settings.gd")
+const TestVisualsScript := preload("res://tests/test_visuals.gd")
 
 
 func _initialize() -> void:
@@ -29,6 +31,9 @@ func _boot_autoloads() -> void:
 	var session := root.get_node_or_null("GameSession")
 	if session and session.has_method("reset_profile"):
 		session.reset_profile(false)
+	var settings := root.get_node_or_null("SettingsService")
+	if settings and settings.has_method("apply"):
+		settings.apply()
 
 
 func _run() -> int:
@@ -42,6 +47,8 @@ func _run() -> int:
 		_suite(TestSaveScript, "save"),
 		_suite(TestContentScript, "content"),
 		_suite(TestCommandScript, "command"),
+		_suite(TestSettingsScript, "settings"),
+		_suite(TestVisualsScript, "visuals"),
 		_smoke(),
 	]
 

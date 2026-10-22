@@ -20,8 +20,14 @@ func refresh() -> void:
 	add_child(box)
 	box.add_child(ThemeFactory.label("Paused", 28, Color(0.95, 0.82, 0.45)))
 	box.add_child(_btn("Resume", _resume))
+	box.add_child(_btn("Settings", _settings))
 	box.add_child(_btn("Save", _save))
 	box.add_child(_btn("Abandon dungeon", _abandon))
+	var settings := SettingsPanel.new()
+	settings.visible = false
+	settings.name = "Settings"
+	settings.closed.connect(func() -> void: visible = true)
+	add_child(settings)
 
 
 func _btn(text: String, cb: Callable) -> Button:
@@ -46,3 +52,10 @@ func _save() -> void:
 func _abandon() -> void:
 	GameSession.end_run(false)
 	get_tree().change_scene_to_file("res://scenes/hub.tscn")
+
+
+func _settings() -> void:
+	var panel := get_node_or_null("Settings")
+	if panel:
+		panel.visible = true
+

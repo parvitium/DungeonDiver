@@ -1,11 +1,16 @@
 # Imported Blender assets
 
-Drop exported `.glb` files here. Greybox nodes are tagged with `asset_socket` metadata:
+Authored meshes already ship under `assets/meshes/` (kit, props, weapons, monsters). Drop replacement `.glb` files here or over those paths. Visual nodes are tagged with `asset_socket` metadata:
 
 - `floor`, `wall`, `ceiling` — dungeon pieces
 - `BodyVisual` — player/monster mesh
 - `WeaponVisual`, `ShieldVisual` — first-person kit
+- `torch`, `barrel`, `chest`, `bones`, `chain` — props
 
-To swap a placeholder, instance the glb as a child of the matching node (or replace the MeshInstance3D) without changing simulation scripts.
+To swap a mesh, instance the glb as a child of the matching node (or replace the MeshInstance3D) without changing simulation scripts.
 
-Greybox art in this repo is original / self-made and released under CC0 1.0. Code is MIT. See the repository `LICENSE`.
+Regenerate the shipped kit with:
+
+`blender --background --python scripts/blender/generate_assets.py`
+
+Art is CC0 (original meshes + Poly Haven textures). See `assets/CREDITS.md`. Code is MIT.

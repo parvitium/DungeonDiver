@@ -33,8 +33,8 @@ Autoload order: `ContentDB` → `GameSession` → `SaveService`.
 2. **Input is a command.** `Player.gather_command()` reads Godot input and **submits** it with `GameSession.submit_command`. `GameSession.tick` runs on `_physics_process` at `process_physics_priority` 20 (after pawns) and applies the inbox via `Player.apply_command` the same frame. Do not call `apply_command` from `_physics_process`, and do not sprinkle `Input.is_action_*` inside combat math. Set `GameSession.accept_local_input = false` when injecting host/remote commands.
 3. **Content is data.** New dungeon/monster/item = Resource + catalog or `data/*.tres`. Do not hard-code type lists in UI; iterate `ContentDB`.
 4. **Scaling is centralized.** `DD.effective_tier`, `DD.depth_scale`, `DD.rarity_weights_for_tier`, `LootGenerator`, `CombatResolver.scaled_monster_*`. If a number changes with depth, it belongs there so tests can lock it.
-5. **Greybox is disposable.** Visual nodes are named `BodyVisual` / `WeaponVisual` / `ShieldVisual` or tagged `asset_socket`. Simulation must not depend on mesh shape beyond collision the builder already creates.
-6. **No paid assets or services.** Placeholders only; credit any future CC0.
+5. **Visuals are disposable sockets.** Nodes are named `BodyVisual` / `WeaponVisual` / `ShieldVisual` or tagged `asset_socket`. Simulation must not depend on mesh shape beyond collision the builder already creates. PBR materials live in `PBRLibrary`; kit assembly in `DungeonKit`.
+6. **No paid assets or services.** CC0 / self-made only. Credit every third-party source in `assets/CREDITS.md`.
 
 ## How a run works
 
@@ -60,5 +60,6 @@ See `docs/multiplayer-plan.md`. Do not add RPCs until that plan is being execute
 ## Godot notes
 
 - Physics layers: world 1, player 2, monster 3, projectile 4, interactable 5, hurtbox 6 (`DD.HURTBOX_LAYER`, unused in this slice).
-- Project feature set: 4.7 Forward Plus.
+- Project feature set: 4.7 Forward Plus. Title scene is the main scene; hub is dungeon select.
+- Settings live in `SettingsService` (`user://dungeondiver_settings.json`): mouse sensitivity, FOV, volume, graphics quality.
 - First import writes `.godot/` (gitignored). CI imports fresh.

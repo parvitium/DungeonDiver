@@ -52,7 +52,7 @@ func _spawn_chests(positions: Array) -> void:
 		var chest := Interactable.new()
 		chest.prompt = "Open chest"
 		chest.consume_on_use = true
-		var visual := Greybox.make_box(Vector3(0.9, 0.7, 0.6), Color(0.45, 0.28, 0.12))
+		var visual := DungeonKit.chest_visual()
 		visual.position = Vector3(0, 0.0, 0)
 		chest.add_child(visual)
 		var shape := CollisionShape3D.new()
@@ -71,8 +71,8 @@ func _spawn_exit(at: Variant) -> void:
 	_exit = Interactable.new()
 	_exit.prompt = "Leave through the gate"
 	_exit.locked = true
-	var visual := Greybox.make_box(Vector3(1.6, 2.6, 0.35), Color(0.35, 0.85, 0.7), false)
-	visual.position = Vector3(0, 1.3, 0)
+	var visual := DungeonKit.gate_visual()
+	visual.position = Vector3(0, 0.0, 0)
 	_exit.add_child(visual)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()

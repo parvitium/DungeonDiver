@@ -17,7 +17,9 @@ var entity_id: String = ""
 
 var _agent: NavigationAgent3D
 var _player: Node3D
-var _visual: MeshInstance3D
+var _visual: Node3D
+var _anim: AnimationPlayer
+var _bob: float = 0.0
 
 
 func setup(p_def: MonsterDef, effective_tier: int) -> void:
@@ -52,14 +54,14 @@ func _build() -> void:
 	capsule.position = Vector3(0, 0.8, 0)
 	add_child(capsule)
 
-	_visual = Greybox.make_capsule_visual(0.38, 1.5, def.color if def else Color.RED)
-	_visual.position = Vector3(0, 0.8, 0)
-	_visual.scale = def.scale if def else Vector3.ONE
+	_visual = _make_body()
 	add_child(_visual)
+	_anim = AssetLibrary.first_animation_player(_visual)
+	AssetLibrary.play_if_has(_anim, "idle")
 
-	if def and def.is_boss:
-		var crown := Greybox.make_box(Vector3(0.7, 0.18, 0.7), Color(0.95, 0.75, 0.2), false)
-		crown.position = Vector3(0, 1.7, 0)
+	if def and def.is_boss and _visual.get_node_or_null("Crown") == null:
+		var crown := MeshFactory.visual(MeshFactory.box(Vector3(0.55, 0.12, 0.55), 0.4), PBRLibrary.metal(), "Crown")
+		crown.position = Vector3(0, 1.85, 0)
 		add_child(crown)
 
 	_agent = NavigationAgent3D.new()
@@ -88,6 +90,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= float(ProjectSettings.get_setting("physics/3d/default_gravity")) * delta
 
 	_update_state()
+	_update_visual(delta)
 	match state:
 		State.PATROL:
 			_move_toward(patrol_target, def.move_speed * 0.55, delta)
@@ -177,9 +180,79 @@ func _die() -> void:
 	state = State.DEAD
 	collision_layer = 0
 	died.emit(self)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.25)
-	tween.tween_callback(queue_free)
+	if not AssetLibrary.play_if_has(_anim, "death"):
+		var tween := create_tween()
+		tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.28)
+		tween.tween_callback(queue_free)
+		return
+	var timer := get_tree().create_timer(0.45)
+	timer.timeout.connect(queue_free)
+
+
+func _make_body() -> Node3D:
+	var authored := AssetLibrary.instance(AssetLibrary.monster_path(def.id if def else &"skeleton"))
+	if authored:
+		authored.name = "BodyVisual"
+		authored.scale = def.scale if def else Vector3.ONE
+		_paint_creature(authored)
+		return authored
+	var fallback := Greybox.make_capsule_visual(0.38, 1.5, def.color if def else Color.RED)
+	fallback.position = Vector3(0, 0.8, 0)
+	fallback.scale = def.scale if def else Vector3.ONE
+	return fallback
+
+
+func _paint_creature(root: Node) -> void:
+	var mat := _creature_material()
+	_paint(root, mat)
+
+
+func _creature_material() -> StandardMaterial3D:
+	if def == null:
+		return PBRLibrary.bone()
+	match String(def.id):
+		"skeleton":
+			return PBRLibrary.tinted(PBRLibrary.bone(), Color(0.9, 0.86, 0.74))
+		"cave_wolf":
+			return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.42, 0.28, 0.18))
+		"wraith":
+			var ghost := PBRLibrary.emissive(Color(0.35, 0.7, 0.85), 1.4)
+			ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			ghost.albedo_color = Color(0.45, 0.75, 0.9, 0.55)
+			return ghost
+		"lich":
+			return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.28, 0.12, 0.32))
+		"cave_troll":
+			return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.38, 0.48, 0.3))
+		_:
+			return PBRLibrary.tinted(PBRLibrary.bone(), def.color)
+
+
+func _paint(node: Node, material: Material) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).material_override = material
+		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	for child in node.get_children():
+		_paint(child, material)
+
+
+func _update_visual(delta: float) -> void:
+	if _visual == null:
+		return
+	match state:
+		State.PATROL:
+			AssetLibrary.play_if_has(_anim, "walk")
+		State.CHASE:
+			AssetLibrary.play_if_has(_anim, "walk")
+		State.ATTACK:
+			AssetLibrary.play_if_has(_anim, "attack")
+		_:
+			AssetLibrary.play_if_has(_anim, "idle")
+	if _anim:
+		return
+	_bob += delta * (6.0 if state == State.CHASE else 3.0)
+	var hop := 0.03 * sin(_bob) if state != State.ATTACK else 0.0
+	_visual.position.y = 0.02 + hop
 
 
 func _pick_patrol() -> void:

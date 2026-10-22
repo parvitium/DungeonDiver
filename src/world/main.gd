@@ -6,4 +6,4 @@ func _ready() -> void:
 
 
 func change_scene() -> void:
-	get_tree().change_scene_to_file("res://scenes/hub.tscn")
+	get_tree().change_scene_to_file("res://scenes/title.tscn")

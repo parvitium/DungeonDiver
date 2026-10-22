@@ -40,6 +40,7 @@ func _build() -> void:
 
 	_title = ThemeFactory.label("", 18, Color(0.9, 0.8, 0.5))
 	_title.position = Vector2(24, 16)
+	_title.size = Vector2(720, 28)
 	root.add_child(_title)
 
 	var bars := VBoxContainer.new()
