@@ -67,11 +67,6 @@ func _build() -> void:
 	_anim = AssetLibrary.first_animation_player(_visual)
 	AssetLibrary.play_if_has(_anim, "idle")
 
-	if def and def.is_boss and _visual.get_node_or_null("Crown") == null and String(def.id) == "cave_troll":
-		var crown := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.42, 0.1, 0.42), 0.02, 0.4), PBRLibrary.metal(), "Crown")
-		crown.position = Vector3(0, 2.05 * (def.scale.y if def else 1.0), 0)
-		add_child(crown)
-
 	_agent = NavigationAgent3D.new()
 	_agent.path_desired_distance = 0.6
 	_agent.target_desired_distance = 1.1
@@ -233,24 +228,29 @@ func _mat_for_part(part_name: String) -> StandardMaterial3D:
 		return PBRLibrary.wood()
 	if n.begins_with("robe") or n.begins_with("cloth") or n.begins_with("hood") or n.begins_with("tatter"):
 		if def and String(def.id) == "wraith":
-			var ghost := PBRLibrary.emissive(Color(0.38, 0.68, 0.82), 0.55)
+			var ghost := PBRLibrary.cloth(Color(0.50, 0.74, 0.86, 0.58))
+			ghost = ghost.duplicate() as StandardMaterial3D
 			ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			ghost.albedo_color = Color(0.42, 0.68, 0.82, 0.48)
+			ghost.albedo_color = Color(0.50, 0.74, 0.86, 0.58)
+			ghost.emission_enabled = true
+			ghost.emission = Color(0.32, 0.62, 0.78)
+			ghost.emission_energy_multiplier = 0.45
+			ghost.cull_mode = BaseMaterial3D.CULL_DISABLED
 			return ghost
-		return PBRLibrary.cloth(Color(0.18, 0.08, 0.24) if def and String(def.id) == "lich" else Color(0.22, 0.12, 0.10))
+		return PBRLibrary.cloth(Color(0.22, 0.10, 0.28) if def and String(def.id) == "lich" else Color(0.24, 0.14, 0.11))
 	if n.begins_with("fur") or n.begins_with("hide"):
-		return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.38, 0.26, 0.16))
+		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.62, 0.46, 0.30) if def and String(def.id) == "cave_wolf" else Color(0.42, 0.48, 0.28))
 	if n.begins_with("stone") or n.begins_with("rock"):
 		return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.40, 0.46, 0.34))
 	if def and String(def.id) == "cave_troll" and (n.begins_with("bone") == false):
-		return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.36, 0.46, 0.30))
+		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.40, 0.48, 0.30))
 	if def and String(def.id) == "cave_wolf":
-		return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.40, 0.28, 0.18))
+		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.55, 0.40, 0.26))
 	return PBRLibrary.tinted(PBRLibrary.bone(), Color(0.90, 0.84, 0.70))
 
 
 func _paint_named(node: Node) -> void:
-	if String(node.name) == "HealthBar":
+	if String(node.name) in ["HealthBar", "CaptureFill", "HealthBarBg", "HealthBarFill"]:
 		return
 	if node is MeshInstance3D:
 		(node as MeshInstance3D).material_override = _mat_for_part(String(node.name))
@@ -319,10 +319,11 @@ func _build_health_bar() -> void:
 	_hp_root.name = "HealthBar"
 	_hp_root.visible = false
 	var height := 1.82 * (def.scale.y if def else 1.0)
-	if def and String(def.id) == "cave_wolf":
-		height = 1.05
-	elif def and String(def.id) == "cave_troll":
-		height = 2.35
+	if _visual:
+		var aabb := _local_aabb(_visual)
+		if aabb.size.y >= 0.3 and aabb.size.y <= 3.6:
+			height = aabb.position.y + aabb.size.y + 0.12
+	height = clampf(height, 0.7, 3.2)
 	_hp_root.position = Vector3(0, height, 0)
 	add_child(_hp_root)
 	var bg := MeshInstance3D.new()
@@ -367,9 +368,16 @@ func _refresh_health_bar() -> void:
 
 func _ground_visual(root: Node3D) -> void:
 	var aabb := _local_aabb(root)
-	if aabb.size.y < 0.05:
+	# Authored glbs are already feet-on-floor. Skip wild unskinned AABBs (the
+	# wolf's 36x bind-pose box used to launch the mesh to y≈39).
+	if aabb.size.y < 0.2 or aabb.size.y > 3.6:
 		return
-	root.position.y -= aabb.position.y
+	var bottom := aabb.position.y * root.scale.y
+	if absf(bottom) <= 0.05:
+		return
+	if absf(bottom) > 1.25:
+		return
+	root.position.y -= bottom / maxf(0.01, root.scale.y)
 
 
 func _local_aabb(root: Node) -> AABB:

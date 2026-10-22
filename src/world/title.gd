@@ -240,3 +240,13 @@ func _open_settings() -> void:
 
 func _quit() -> void:
 	get_tree().quit()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if _settings and _settings.visible:
+			_settings.visible = false
+			get_viewport().set_input_as_handled()
+		elif _bestiary and _bestiary.visible:
+			_bestiary.visible = false
+			get_viewport().set_input_as_handled()

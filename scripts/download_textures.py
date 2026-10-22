@@ -22,6 +22,8 @@ POLYHAVEN = {
     "wood": "weathered_planks",
     "metal": "rusty_metal_02",
     "bone": "plaster_stone_wall_01",
+    "cloth": "hessian_230",
+    "hide": "brown_leather",
 }
 
 # fallbacks if a Poly Haven id 404s
@@ -33,6 +35,8 @@ POLYHAVEN_FALLBACK = {
     "wood": ["wood_planks_grey", "ancient_wooden_planks", "wood_table_001"],
     "metal": ["rusty_metal", "metal_plate", "corrugated_iron_02"],
     "bone": ["plaster_02", "grey_plaster_03", "concrete_layers_02"],
+    "cloth": ["rough_linen", "fabric_pattern_05", "denim_fabric"],
+    "hide": ["leather_white", "leather_red_02", "fabric_leather_02"],
 }
 
 MAPS = {

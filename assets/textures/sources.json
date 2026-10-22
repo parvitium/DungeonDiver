@@ -5,5 +5,7 @@
   "cavern_floor": "forest_ground_04",
   "wood": "weathered_planks",
   "metal": "rusty_metal_02",
-  "bone": "plaster_stone_wall_01"
+  "bone": "plaster_stone_wall_01",
+  "cloth": "hessian_230",
+  "hide": "brown_leather"
 }

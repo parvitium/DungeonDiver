@@ -68,13 +68,20 @@ static func cloth(color: Color) -> StandardMaterial3D:
 	var key := "cloth:%s" % color.to_html()
 	if _cache.has(key):
 		return _cache[key]
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = 0.88
-	mat.metallic = 0.0
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var mat := tinted(_pbr("cloth", Color(1, 1, 1), 0.90, 0.0, 0.85, 0.55), color)
+	if mat.albedo_texture == null:
+		mat.roughness = 0.88
+		mat.metallic = 0.0
 	_cache[key] = mat
 	return mat
+
+
+static func hide() -> StandardMaterial3D:
+	return _pbr("hide", Color(0.72, 0.54, 0.36), 0.78, 0.0, 0.9, 0.85)
+
+
+static func skin() -> StandardMaterial3D:
+	return hide()
 
 
 static func puddle() -> StandardMaterial3D:

@@ -51,6 +51,10 @@ static func _bestiary_layout(t: DDTest) -> void:
 			var min_size: Vector2 = (sheet as Control).custom_minimum_size
 			t.assert_true(min_size.x <= 1280.0, "bestiary fits 720p width")
 			t.assert_true(min_size.y <= 720.0, "bestiary fits 720p height")
+	var labels: PackedStringArray = []
+	for btn in _buttons(best):
+		labels.append(btn.text)
+	t.assert_true("Back" in labels, "bestiary has Back")
 	best.free()
 
 

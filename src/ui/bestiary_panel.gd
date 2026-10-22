@@ -70,3 +70,9 @@ func refresh() -> void:
 		log.add_child(ThemeFactory.label(def.display_name, 16, Color(0.9, 0.8, 0.5)))
 		log.add_child(ThemeFactory.label("%s — %s" % [status, def.description], 13, Color(0.7, 0.65, 0.52)))
 	cols.add_child(log)
+	var back := Button.new()
+	back.text = "Back"
+	back.custom_minimum_size = Vector2(0, 36)
+	ThemeFactory.apply_button(back)
+	back.pressed.connect(func() -> void: visible = false)
+	root.add_child(back)

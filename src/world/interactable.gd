@@ -14,7 +14,12 @@ func _ready() -> void:
 	collision_layer = DD.INTERACT_LAYER
 	collision_mask = 0
 	monitoring = false
-	monitorable = true
+	call_deferred("_enable_monitorable")
+
+
+func _enable_monitorable() -> void:
+	if is_inside_tree():
+		monitorable = true
 
 
 func try_use(by: Node) -> bool:

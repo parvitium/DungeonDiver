@@ -101,9 +101,9 @@ func _build_rig() -> void:
 	_melee_area.add_child(melee_shape)
 	head.add_child(_melee_area)
 
-	_weapon_visual = _viewmodel(AssetLibrary.weapon_path("sword"), Vector3(0.06, 0.04, 0.72), PBRLibrary.metal(), "WeaponVisual", Vector3(68, 188, 6), 0.48)
-	_weapon_visual.position = Vector3(0.4, -0.36, -0.5)
-	_weapon_visual.rotation_degrees = Vector3(10, 8, 14)
+	_weapon_visual = _viewmodel(AssetLibrary.weapon_path("sword"), Vector3(0.05, 0.03, 0.52), PBRLibrary.metal(), "WeaponVisual", Vector3(68, 188, 6), 0.26)
+	_weapon_visual.position = Vector3(0.28, -0.22, -0.38)
+	_weapon_visual.rotation_degrees = Vector3(12, 10, 12)
 	head.add_child(_weapon_visual)
 
 	_shield_visual = _viewmodel(AssetLibrary.weapon_path("shield"), Vector3(0.34, 0.46, 0.06), PBRLibrary.wood(), "ShieldVisual", Vector3(8, 180, 0), 0.55)

@@ -22,6 +22,7 @@ func _run() -> void:
 	await _capture_title_or_hub()
 	await _capture_dungeon(&"crypt", "crypt")
 	await _capture_dungeon(&"cavern", "cavern")
+	await _capture_creature_sheet(&"crypt")
 	print("CAPTURE_OK %s" % _out_dir)
 	get_tree().quit(0)
 
@@ -91,6 +92,75 @@ func _capture_dungeon(dungeon_id: StringName, label: String) -> void:
 			if label == "crypt":
 				await _capture_hud_overlays(run, player)
 			GameSession.accept_local_input = true
+	run.queue_free()
+	if GameSession.run != null:
+		GameSession.end_run(false)
+	await _settle(2)
+
+
+func _capture_creature_sheet(dungeon_id: StringName) -> void:
+	GameSession.start_run(dungeon_id, 1, 2026)
+	var run: Node = load("res://scenes/dungeon_run.tscn").instantiate()
+	add_child(run)
+	await _settle(12)
+	var player := get_tree().get_first_node_in_group("player")
+	if player == null:
+		run.queue_free()
+		return
+	GameSession.accept_local_input = false
+	if player is Player:
+		player.input_enabled = false
+		player.set_physics_process(false)
+	for existing in get_tree().get_nodes_in_group("monsters"):
+		existing.set_physics_process(false)
+		existing.visible = false
+	var stand: Vector3 = player.global_position
+	var dir: Vector3 = _open_offset(player).normalized()
+	if dir.length() < 0.05:
+		dir = Vector3(0, 0, -1)
+	var ids: PackedStringArray = ["skeleton", "wraith", "lich", "cave_troll", "cave_wolf"]
+	for id in ids:
+		var def: MonsterDef = ContentDB.get_monster(StringName(id))
+		if def == null:
+			continue
+		var monster_script: GDScript = load("res://src/monster/monster.gd")
+		var mob: Node = monster_script.new()
+		run.add_child(mob)
+		mob.call("setup", def, 1)
+		mob.set_physics_process(false)
+		var gameplay := stand + dir * 3.35
+		mob.global_position = gameplay
+		if mob.has_method("sync_home"):
+			mob.call("sync_home")
+		player.global_position = stand + dir * 0.15
+		_face_toward(mob, player.global_position)
+		_aim_player_at(player, mob)
+		var lamp := OmniLight3D.new()
+		lamp.name = "CaptureFill"
+		lamp.light_color = Color(1.0, 0.91, 0.74)
+		lamp.light_energy = 7.0
+		lamp.omni_range = 9.0
+		lamp.omni_attenuation = 0.85
+		lamp.shadow_enabled = false
+		lamp.position = Vector3(0.15, 1.55, 0.85)
+		mob.add_child(lamp)
+		if mob.has_method("receive_hit"):
+			mob.call("receive_hit", 3.0, player.global_position, true)
+		await _settle(8)
+		_aim_player_at(player, mob)
+		await _settle(3)
+		_save("%s_gameplay" % id)
+		player.global_position = gameplay - dir * 1.42
+		_aim_player_at(player, mob)
+		if player is Player:
+			(player as Player).look_pitch = -0.18 if id == "cave_wolf" else 0.04
+			if player._camera:
+				player._camera.get_parent().rotation.x = (player as Player).look_pitch
+		await _settle(5)
+		_save("%s_close" % id)
+		mob.queue_free()
+		await _settle(2)
+	GameSession.accept_local_input = true
 	run.queue_free()
 	if GameSession.run != null:
 		GameSession.end_run(false)

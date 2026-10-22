@@ -17,6 +17,19 @@ func world_center() -> Vector3:
 	return world_origin() + Vector3(0.0, 0.0, 0.0)
 
 
+func facing_yaw() -> float:
+	# Default Node3D forward is -Z, which is north in this generator.
+	if bool(doors.get("n", false)):
+		return 0.0
+	if bool(doors.get("e", false)):
+		return -PI * 0.5
+	if bool(doors.get("s", false)):
+		return PI
+	if bool(doors.get("w", false)):
+		return PI * 0.5
+	return 0.0
+
+
 func to_dict() -> Dictionary:
 	return {
 		"cell": [cell.x, cell.y],

@@ -59,6 +59,7 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: 
 
 	if room.kind == DD.RoomKind.START:
 		markers["player"] = origin + Vector3(0, 0.05, 0)
+		markers["player_yaw"] = room.facing_yaw()
 		var plinth := DungeonKit.slab(Vector3(1.5, 0.4, 1.5), PBRLibrary.wood(), "plinth", 0.6)
 		plinth.position = origin + Vector3(-3.5, 0.2, -3.5)
 		parent.add_child(plinth)
