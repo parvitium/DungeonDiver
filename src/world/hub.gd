@@ -3,15 +3,24 @@ extends Node3D
 var _ui: Control
 var _depth: int = 1
 var _selected: StringName = &"crypt"
+var _load_notice: String = ""
 
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	GameSession.ui_open = true
-	if SaveService.has_save():
-		SaveService.load_game()
+	_try_continue()
 	_build_room()
 	_build_ui()
+
+
+func _try_continue() -> void:
+	if SaveService.has_save():
+		_apply_load_result(SaveService.load_game())
+
+
+func load_notice_text() -> String:
+	return _load_notice
 
 
 func _build_room() -> void:
@@ -57,6 +66,8 @@ func _build_ui() -> void:
 
 
 func _refresh_ui() -> void:
+	if _ui == null:
+		return
 	while _ui.get_child_count() > 0:
 		_ui.get_child(0).free()
 	var margin := MarginContainer.new()
@@ -71,6 +82,9 @@ func _refresh_ui() -> void:
 	margin.add_child(root)
 	root.add_child(ThemeFactory.label("DungeonDiver", 42, Color(0.95, 0.82, 0.42)))
 	root.add_child(ThemeFactory.label("Conquer every dungeon. Catalog every beast. Get cooler gear as you go deeper.", 16, Color(0.8, 0.74, 0.6)))
+	if not _load_notice.is_empty():
+		root.add_child(ThemeFactory.label(_load_notice, 16, Color(0.95, 0.55, 0.4)))
+		root.add_child(ThemeFactory.label("Choose New Game to start over.", 14, Color(0.85, 0.65, 0.45)))
 
 	var monsters := ContentDB.monster_ids()
 	var dungeons := ContentDB.dungeon_ids()
@@ -126,10 +140,7 @@ func _refresh_ui() -> void:
 	actions.add_child(_btn("Open pack (I)", _open_inv))
 	actions.add_child(_btn("Bestiary (B)", _open_bestiary))
 	actions.add_child(_btn("Save", func() -> void: SaveService.save_game()))
-	actions.add_child(_btn("Load", func() -> void:
-		SaveService.load_game()
-		_refresh_ui()
-	))
+	actions.add_child(_btn("Load / Continue", _load_pressed))
 	actions.add_child(_btn("New game", _new_game))
 
 	var inv := preload("res://src/ui/inventory_panel.gd").new()
@@ -180,7 +191,24 @@ func _open_bestiary() -> void:
 		_ui.get_node("Inv").visible = false
 
 
+func _apply_load_result(ok: bool) -> void:
+	if ok:
+		_load_notice = ""
+	else:
+		_load_notice = SaveService.load_failure_message()
+
+
+func _load_pressed() -> void:
+	if not SaveService.has_save():
+		_load_notice = "No save to load."
+		_refresh_ui()
+		return
+	_apply_load_result(SaveService.load_game())
+	_refresh_ui()
+
+
 func _new_game() -> void:
+	_load_notice = ""
 	GameSession.reset_profile()
 	SaveService.clear_save()
 	_refresh_ui()

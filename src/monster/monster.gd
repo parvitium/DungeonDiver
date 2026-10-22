@@ -22,7 +22,7 @@ var _visual: MeshInstance3D
 
 func setup(p_def: MonsterDef, effective_tier: int) -> void:
 	def = p_def
-	entity_id = GameSession.rng.next_id("mob") if GameSession and GameSession.rng else DD.new_id("mob")
+	entity_id = GameSession.ai_rng.next_id("mob") if GameSession and GameSession.ai_rng else DD.new_id("mob")
 	max_health = CombatResolver.scaled_monster_health(def.max_health, effective_tier)
 	health = max_health
 	damage = CombatResolver.scaled_monster_damage(def.damage, effective_tier)
@@ -183,11 +183,11 @@ func _die() -> void:
 
 
 func _pick_patrol() -> void:
-	var session_rng: GameRNG = GameSession.rng if GameSession and GameSession.rng else GameRNG.new(1)
+	var stream: GameRNG = GameSession.ai_rng if GameSession and GameSession.ai_rng else GameRNG.new(1)
 	patrol_target = home + Vector3(
-		session_rng.randf_range(-3.5, 3.5),
+		stream.randf_range(-3.5, 3.5),
 		0,
-		session_rng.randf_range(-3.5, 3.5)
+		stream.randf_range(-3.5, 3.5)
 	)
 
 

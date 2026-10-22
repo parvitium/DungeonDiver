@@ -1,30 +1,45 @@
 extends Node
-## Authoritative session: profile, run, command inbox, and seeded RNG.
-## Player submits PlayerCommand; this node applies it on its physics tick.
+## Authoritative session: profile, run, command inbox, and seeded RNG streams.
+## Player submits PlayerCommand; this node applies it on its physics tick
+## (process_physics_priority 20, after pawns submit — same frame, no inbox lag).
 
 signal profile_changed
 signal run_started
 signal run_ended(victory: bool)
 signal log_message(text: String, color: Color)
 
+const AI_RNG_SALT := 0xA11A1
+
 var profile: PlayerProfile = PlayerProfile.new()
 var run: DungeonRunState = null
 var ui_open: bool = false
 var accept_local_input: bool = true
-## Seeded wrapper around RandomNumberGenerator. Loot and combat rolls use this.
+## Seeded loot / combat / drop rolls. Independent of monster AI.
 var rng: GameRNG = GameRNG.new(1)
+## Seeded monster patrol / AI. Independent of loot.
+var ai_rng: GameRNG = GameRNG.new(1)
 
 var _command_inbox: Array[PlayerCommand] = []
 
 
+func _init() -> void:
+	# tick is _physics_process; lower physics priority runs first (pawns at 0).
+	process_physics_priority = 20
+
+
+func _enter_tree() -> void:
+	process_physics_priority = 20
+
+
 func _ready() -> void:
-	process_priority = 20
+	process_physics_priority = 20
 	reset_profile(false)
 
 
 func reset_profile(emit_change: bool = true) -> void:
 	profile = PlayerProfile.new()
 	rng = GameRNG.new(1)
+	ai_rng = GameRNG.new(_stream_seed(1, AI_RNG_SALT))
 	_command_inbox.clear()
 	profile.grant_starter_kit(ContentDB.items, rng)
 	if emit_change:
@@ -67,6 +82,7 @@ func start_run(dungeon_id: StringName, depth: int, seed_value: int = 0) -> Dunge
 	run.blueprint = DungeonGenerator.generate(def, run.depth, run.seed_value)
 	run.blueprint.effective_tier = run.effective_tier
 	rng = GameRNG.new(run.seed_value)
+	ai_rng = GameRNG.new(_stream_seed(run.seed_value, AI_RNG_SALT))
 	_command_inbox.clear()
 	run_started.emit()
 	log_message.emit("Entered %s (depth %d)." % [def.display_name, run.depth], Color(0.85, 0.75, 0.45))
@@ -114,6 +130,19 @@ func randf() -> float:
 
 func engine_rng() -> RandomNumberGenerator:
 	return rng.engine()
+
+
+func engine_ai_rng() -> RandomNumberGenerator:
+	return ai_rng.engine()
+
+
+static func _stream_seed(base: int, salt: int) -> int:
+	var mixed := base ^ salt
+	if mixed == 0:
+		mixed = base + salt
+	if mixed == 0:
+		mixed = 1
+	return mixed
 
 
 func _find_player() -> Node:

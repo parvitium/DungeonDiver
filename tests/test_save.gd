@@ -10,6 +10,7 @@ static func run() -> DDTest:
 	_drop_unknown_ids(t)
 	_clamp_enums(t)
 	_quarantine_corrupt(t)
+	_hub_load_failure(t)
 	return t
 
 
@@ -187,18 +188,95 @@ static func _quarantine_corrupt(t: DDTest) -> void:
 	var path := "user://dd_qa_corrupt.json"
 	var session := DDTest.autoload("GameSession")
 	var saves := DDTest.autoload("SaveService")
-	saves.clear_save(path)
-	if not saves.last_quarantine_path.is_empty() and FileAccess.file_exists(saves.last_quarantine_path):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(saves.last_quarantine_path))
+	_cleanup_quarantine(saves, path)
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	file.store_string(JSON.stringify({"version": 1, "profile": "not-a-dict"}))
 	file.close()
 	session.profile.display_name = "BeforeCorruptLoad"
 	t.assert_false(saves.load_game(path), "corrupt load fails")
-	t.assert_eq(session.profile.display_name, "Diver", "corrupt load starts fresh")
+	t.assert_eq(session.profile.display_name, "BeforeCorruptLoad", "corrupt load leaves profile")
 	t.assert_false(FileAccess.file_exists(path), "corrupt original removed")
 	t.assert_true(not saves.last_quarantine_path.is_empty(), "quarantine path recorded")
 	t.assert_true(FileAccess.file_exists(saves.last_quarantine_path), "quarantine copy exists")
 	t.assert_true(saves.last_quarantine_path.contains(".corrupt-"), "quarantine suffix")
+	t.assert_true(
+		saves.load_failure_message().begins_with("Save couldn't be loaded; backed up to"),
+		"failure message names the backup"
+	)
+	t.assert_true(saves.load_failure_message().contains(saves.last_quarantine_path), "message includes path")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(saves.last_quarantine_path))
+
+	var future_path := "user://dd_qa_future.json"
+	_cleanup_quarantine(saves, future_path)
+	file = FileAccess.open(future_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 99, "profile": {"display_name": "FromTheFuture"}}))
+	file.close()
+	session.profile.display_name = "StillPresent"
+	t.assert_false(saves.load_game(future_path), "future version load fails")
+	t.assert_eq(session.profile.display_name, "StillPresent", "future version leaves profile")
+	t.assert_false(FileAccess.file_exists(future_path), "future original removed")
+	t.assert_true(
+		saves.load_failure_message().begins_with("Save couldn't be loaded; backed up to"),
+		"future version backup message"
+	)
+	if not saves.last_quarantine_path.is_empty() and FileAccess.file_exists(saves.last_quarantine_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(saves.last_quarantine_path))
 	session.reset_profile(false)
+
+
+static func _hub_load_failure(t: DDTest) -> void:
+	var session := DDTest.autoload("GameSession")
+	var saves := DDTest.autoload("SaveService")
+	var tree := Engine.get_main_loop() as SceneTree
+	_cleanup_quarantine(saves, DD.SAVE_PATH)
+	session.profile.display_name = "KeepHub"
+
+	var hub: Node = (load("res://src/world/hub.gd") as GDScript).new()
+	tree.root.add_child(hub)
+	hub.call("_try_continue")
+	t.assert_eq(hub.load_notice_text(), "", "no notice without save")
+	t.assert_eq(session.profile.display_name, "KeepHub", "hub boot without save leaves profile")
+
+	var file := FileAccess.open(DD.SAVE_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 1, "profile": "not-a-dict"}))
+	file.close()
+	hub.call("_load_pressed")
+	t.assert_eq(session.profile.display_name, "KeepHub", "Load failure does not start a new game")
+	t.assert_false(FileAccess.file_exists(DD.SAVE_PATH), "Load quarantines the file")
+	var notice: String = hub.load_notice_text()
+	t.assert_true(
+		notice.begins_with("Save couldn't be loaded; backed up to"),
+		"Load shows backup message"
+	)
+	t.assert_true(notice.contains(".corrupt-"), "Load message includes backup path")
+
+	hub.call("_new_game")
+	t.assert_eq(hub.load_notice_text(), "", "New Game clears notice")
+	t.assert_eq(session.profile.display_name, "Diver", "New Game is an explicit reset")
+
+	hub.free()
+	_cleanup_quarantine(saves, DD.SAVE_PATH)
+
+	session.profile.display_name = "BootKeep"
+	file = FileAccess.open(DD.SAVE_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 99, "profile": {"display_name": "FromTheFuture"}}))
+	file.close()
+	var continue_hub: Node = (load("res://src/world/hub.gd") as GDScript).new()
+	tree.root.add_child(continue_hub)
+	continue_hub.call("_try_continue")
+	t.assert_eq(session.profile.display_name, "BootKeep", "Continue failure does not start a new game")
+	t.assert_true(
+		continue_hub.load_notice_text().begins_with("Save couldn't be loaded; backed up to"),
+		"Continue shows backup message"
+	)
+	continue_hub.free()
+	session.ui_open = false
+	_cleanup_quarantine(saves, DD.SAVE_PATH)
+	session.reset_profile(false)
+
+
+static func _cleanup_quarantine(saves: Node, path: String) -> void:
+	saves.clear_save(path)
+	if not saves.last_quarantine_path.is_empty() and FileAccess.file_exists(saves.last_quarantine_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(saves.last_quarantine_path))
+	saves.last_quarantine_path = ""

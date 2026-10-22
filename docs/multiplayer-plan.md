@@ -11,10 +11,11 @@ These pieces are wired and tested. Do not describe them as more than this.
 | `PlayerCommand` | One tick of intent (move, look, jump, sprint, melee, block, cast, interact). `to_dict` / `from_dict` for later RPCs. |
 | `Player.gather_command()` | Reads Godot `Input` + mouse look on the local pawn. |
 | `GameSession` command inbox | `Player._physics_process` calls `GameSession.submit_command(gather_command())` when `accept_local_input` is true. It does **not** apply the command itself. |
-| `GameSession.tick(delta)` | Runs on the session's physics tick (`process_priority` 20, after pawns). Drains the inbox and calls `Player.apply_command(cmd, delta)` on the first `"player"` node. Tests call `tick` directly. |
+| `GameSession.tick(delta)` | Runs on the session's `_physics_process` with `process_physics_priority` 20 (after pawns at 0). Pawns submit this frame, then the session drains the inbox and calls `Player.apply_command(cmd, delta)` on the first `"player"` node — same frame, no inbox lag. Tests call `tick` directly. |
 | `Player.apply_command` | The only pawn step. Host (and today's solo session) run this. |
-| `GameSession.rng` | A `GameRNG` wrapping a seeded `RandomNumberGenerator`. `start_run` reseeds it from `run.seed_value`. Loot (`roll_table`), monster drop chance, and patrol picks use this stream. `CombatResolver` stays pure math; any combat roll goes through `GameSession.rng`. |
-| Determinism | Same `seed_value` + same `PlayerCommand` sequence + same `roll_table` / `randf` order produces the same loot and rolls (`tests/test_command.gd`). |
+| `GameSession.rng` | A `GameRNG` wrapping a seeded `RandomNumberGenerator`. `start_run` reseeds it from `run.seed_value`. Loot (`roll_table`), monster drop chance, and combat rolls use this stream. `CombatResolver` stays pure math. |
+| `GameSession.ai_rng` | A second `GameRNG`, seeded from the same run seed with a fixed salt. Monster patrol, AI, and mob entity ids use this stream so they cannot desync loot. |
+| Determinism | Same `seed_value` + same `PlayerCommand` sequence produces the same loot and AI. Patrol ticks do not consume the loot stream (`tests/test_command.gd`). |
 | `ContentDB` | Shared defs. Extra `.tres` files are class-checked (`is ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable`) and field-validated before insert. |
 | Entity ids on items/monsters | Spawn keys (`GameRNG.next_id`). |
 | `CombatResolver` / `LootGenerator` | Pure functions. Session supplies the RNG. No `multiplayer.is_server()` inside them. |

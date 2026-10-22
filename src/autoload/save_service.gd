@@ -16,6 +16,7 @@ func save_game(path: String = DD.SAVE_PATH) -> bool:
 
 
 func load_game(path: String = DD.SAVE_PATH) -> bool:
+	last_quarantine_path = ""
 	if not FileAccess.file_exists(path):
 		return false
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -26,8 +27,14 @@ func load_game(path: String = DD.SAVE_PATH) -> bool:
 	if parsed is Dictionary and apply_payload(parsed):
 		return true
 	_quarantine_file(path)
-	GameSession.reset_profile()
+	# Leave the in-memory profile alone. Hub checks this bool and offers New Game.
 	return false
+
+
+func load_failure_message() -> String:
+	if last_quarantine_path.is_empty():
+		return "Save couldn't be loaded."
+	return "Save couldn't be loaded; backed up to %s" % last_quarantine_path
 
 
 func apply_payload(payload: Variant) -> bool:
@@ -59,4 +66,4 @@ func _quarantine_file(path: String) -> void:
 		return
 	DirAccess.remove_absolute(src_abs)
 	last_quarantine_path = dest
-	push_warning("Corrupt save quarantined to %s; started a fresh profile." % dest)
+	push_warning("Corrupt save quarantined to %s." % dest)
