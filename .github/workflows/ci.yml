@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  headless-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: "${{ runner.temp }}/godot"
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "${{ runner.temp }}/godot"
+          curl -fsSL -o "${{ runner.temp }}/godot/godot.zip" \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "${{ runner.temp }}/godot/godot.zip" -d "${{ runner.temp }}/godot"
+          chmod +x "${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+
+      - name: Import project
+        run: |
+          "${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
+            --headless --path . --import --quit
+
+      - name: Run headless tests
+        run: |
+          "${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
+            --headless --path . -s res://tests/run_tests.gd
+
+      - name: Scene smoke
+        run: |
+          set -euo pipefail
+          GODOT="${{ runner.temp }}/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          OUT="${{ runner.temp }}/smoke.log"
+          # No --quit-after: a hang must fail. timeout is 124 on expiry.
+          timeout --signal=TERM --kill-after=5s 45s \
+            "$GODOT" --headless --path . res://tests/smoke_play.tscn | tee "$OUT"
+          grep -q "SMOKE_PLAY OK" "$OUT"
