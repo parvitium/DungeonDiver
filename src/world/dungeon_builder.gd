@@ -37,28 +37,32 @@ func build(parent: Node3D, blueprint: DungeonBlueprint, def: DungeonTypeDef, bak
 func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: DungeonTypeDef, theme: StringName, markers: Dictionary) -> void:
 	var origin := room.world_origin()
 	var half := DD.ROOM_SIZE * 0.5
+	var wall_h := room.wall_height()
 
-	var floor_body := DungeonKit.slab(Vector3(DD.ROOM_SIZE, 0.35, DD.ROOM_SIZE), PBRLibrary.floor_mat(theme), "floor", 1.0)
+	var floor_body := DungeonKit.flagstone_floor(Vector3(DD.ROOM_SIZE, 0.35, DD.ROOM_SIZE), theme, int(origin.x * 13.0 + origin.z * 29.0) + int(room.kind))
 	floor_body.position = origin + Vector3(0, -0.175, 0)
 	nav.add_child(floor_body)
 
-	var ceiling := DungeonKit.slab(Vector3(DD.ROOM_SIZE, 0.3, DD.ROOM_SIZE), PBRLibrary.ceiling(theme), "ceiling", 1.0)
-	ceiling.position = origin + Vector3(0, DD.WALL_HEIGHT + 0.15, 0)
+	var ceiling := DungeonKit.vaulted_ceiling(Vector3(DD.ROOM_SIZE, 0.28, DD.ROOM_SIZE), theme, wall_h)
+	var rise := clampf(wall_h * 0.34, 0.95, 1.7)
+	ceiling.position = origin + Vector3(0, wall_h - rise + 0.12, 0)
 	parent.add_child(ceiling)
 
-	DungeonKit.wall_run(parent, origin + Vector3(0, DD.WALL_HEIGHT * 0.5, -half), Vector3(DD.ROOM_SIZE, DD.WALL_HEIGHT, DD.WALL_THICKNESS), bool(room.doors["n"]), theme, "n")
-	DungeonKit.wall_run(parent, origin + Vector3(0, DD.WALL_HEIGHT * 0.5, half), Vector3(DD.ROOM_SIZE, DD.WALL_HEIGHT, DD.WALL_THICKNESS), bool(room.doors["s"]), theme, "s")
-	DungeonKit.wall_run(parent, origin + Vector3(half, DD.WALL_HEIGHT * 0.5, 0), Vector3(DD.WALL_THICKNESS, DD.WALL_HEIGHT, DD.ROOM_SIZE), bool(room.doors["e"]), theme, "e")
-	DungeonKit.wall_run(parent, origin + Vector3(-half, DD.WALL_HEIGHT * 0.5, 0), Vector3(DD.WALL_THICKNESS, DD.WALL_HEIGHT, DD.ROOM_SIZE), bool(room.doors["w"]), theme, "w")
+	DungeonKit.wall_run(parent, origin + Vector3(0, wall_h * 0.5, -half), Vector3(DD.ROOM_SIZE, wall_h, DD.WALL_THICKNESS), bool(room.doors["n"]), theme, "n")
+	DungeonKit.wall_run(parent, origin + Vector3(0, wall_h * 0.5, half), Vector3(DD.ROOM_SIZE, wall_h, DD.WALL_THICKNESS), bool(room.doors["s"]), theme, "s")
+	DungeonKit.wall_run(parent, origin + Vector3(half, wall_h * 0.5, 0), Vector3(DD.WALL_THICKNESS, wall_h, DD.ROOM_SIZE), bool(room.doors["e"]), theme, "e")
+	DungeonKit.wall_run(parent, origin + Vector3(-half, wall_h * 0.5, 0), Vector3(DD.WALL_THICKNESS, wall_h, DD.ROOM_SIZE), bool(room.doors["w"]), theme, "w")
 
-	DungeonKit.pillars(parent, origin, theme)
-	DungeonKit.beams(parent, origin, theme)
-	DungeonKit.wall_torches(parent, origin, room, theme)
+	DungeonKit.rounded_corners(parent, origin, theme, wall_h)
+	DungeonKit.pillars(parent, origin, theme, wall_h)
+	DungeonKit.beams(parent, origin, theme, wall_h)
+	DungeonKit.wall_torches(parent, origin, room, theme, wall_h)
 	DungeonKit.decorate(parent, origin, room, theme)
-	_room_key_light(parent, origin, room, _def)
+	DungeonKit.niches(parent, origin, room, theme, wall_h)
+	_room_key_light(parent, origin, room, _def, wall_h)
 
 	if room.kind == DD.RoomKind.START:
-		markers["player"] = origin + Vector3(0, 0.05, 0)
+		markers["player"] = origin + room.spawn_offset()
 		markers["player_yaw"] = room.facing_yaw()
 		var plinth := DungeonKit.slab(Vector3(1.5, 0.4, 1.5), PBRLibrary.wood(), "plinth", 0.6)
 		plinth.position = origin + Vector3(-3.5, 0.2, -3.5)
@@ -78,16 +82,16 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: 
 		markers["exit"] = origin + Vector3(0, 0.1, 3.6)
 
 
-func _room_key_light(parent: Node3D, origin: Vector3, room: RoomSpec, def: DungeonTypeDef) -> void:
+func _room_key_light(parent: Node3D, origin: Vector3, room: RoomSpec, def: DungeonTypeDef, wall_h: float = DD.WALL_HEIGHT) -> void:
 	var key := OmniLight3D.new()
 	key.name = "RoomFill"
-	key.position = origin + Vector3(0, 3.1, 0)
+	key.position = origin + Vector3(0, wall_h * 0.72, 0)
 	var cool := Color(0.52, 0.64, 0.80)
 	if def != null and String(def.id) == "cavern":
 		cool = Color(0.48, 0.60, 0.56)
 	key.light_color = cool
-	key.light_energy = 2.4 if room.kind == DD.RoomKind.BOSS else 1.7
-	key.omni_range = 10.0
-	key.omni_attenuation = 1.15
+	key.light_energy = 4.0 if room.kind == DD.RoomKind.BOSS else 3.1
+	key.omni_range = 12.0
+	key.omni_attenuation = 0.95
 	VisualLook.configure_omni(key, false)
 	parent.add_child(key)

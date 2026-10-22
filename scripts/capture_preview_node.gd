@@ -51,12 +51,15 @@ func _capture_dungeon(dungeon_id: StringName, label: String) -> void:
 	add_child(run)
 	await _settle(14)
 	_save(label)
+	if label == "crypt":
+		_save("crypt_spawn")
 	var player := get_tree().get_first_node_in_group("player")
 	if player is Player:
-		player.rotate_y(0.85)
-		player.look_pitch = -0.12
+		player.rotate_y(0.28)
+		player.look_pitch = 0.18
 		if player._camera:
 			player._camera.get_parent().rotation.x = player.look_pitch
+		player.global_position += -player.global_transform.basis.z * 1.15
 		await _settle(6)
 		_save(label + "_look")
 		var mobs := get_tree().get_nodes_in_group("monsters")
@@ -138,8 +141,8 @@ func _capture_creature_sheet(dungeon_id: StringName) -> void:
 		var lamp := OmniLight3D.new()
 		lamp.name = "CaptureFill"
 		lamp.light_color = Color(1.0, 0.91, 0.74)
-		lamp.light_energy = 7.0
-		lamp.omni_range = 9.0
+		lamp.light_energy = 11.0
+		lamp.omni_range = 10.0
 		lamp.omni_attenuation = 0.85
 		lamp.shadow_enabled = false
 		lamp.position = Vector3(0.15, 1.55, 0.85)
@@ -150,10 +153,16 @@ func _capture_creature_sheet(dungeon_id: StringName) -> void:
 		_aim_player_at(player, mob)
 		await _settle(3)
 		_save("%s_gameplay" % id)
-		player.global_position = gameplay - dir * 1.42
+		var side := Vector3(dir.z, 0, -dir.x)
+		if side.length() < 0.05:
+			side = Vector3(1, 0, 0)
+		side = side.normalized()
+		var side_amt := 0.85 if id == "cave_wolf" else 0.48
+		player.global_position = gameplay - dir * (0.95 if id == "cave_wolf" else 0.78) + side * side_amt
+		_face_toward(mob, player.global_position)
 		_aim_player_at(player, mob)
 		if player is Player:
-			(player as Player).look_pitch = -0.18 if id == "cave_wolf" else 0.04
+			(player as Player).look_pitch = -0.12 if id == "cave_wolf" else 0.06
 			if player._camera:
 				player._camera.get_parent().rotation.x = (player as Player).look_pitch
 		await _settle(5)

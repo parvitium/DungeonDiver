@@ -26,6 +26,9 @@ POLYHAVEN = {
     "hide": "brown_leather",
 }
 
+# Original 1K maps from scripts/make_pbr_maps.py (not Poly Haven).
+GENERATED = ("skin", "fur")
+
 # fallbacks if a Poly Haven id 404s
 POLYHAVEN_FALLBACK = {
     "crypt_brick": ["brick_wall_02", "castle_brick_07", "plastered_stone_wall"],

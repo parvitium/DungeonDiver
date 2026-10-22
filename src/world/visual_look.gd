@@ -44,9 +44,9 @@ static func make_environment(def: DungeonTypeDef) -> Environment:
 	else:
 		env.ambient_light_color = Color(0.44, 0.50, 0.58)
 	if not using_forward_plus() or q == "low":
-		env.ambient_light_energy = 0.78
+		env.ambient_light_energy = 1.05
 	else:
-		env.ambient_light_energy = 0.28
+		env.ambient_light_energy = 0.40
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.02
 	env.tonemap_white = 6.5

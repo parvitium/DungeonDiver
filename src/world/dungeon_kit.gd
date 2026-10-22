@@ -31,6 +31,81 @@ static func slab(size: Vector3, material: Material, socket: String, tile: float 
 	return body
 
 
+static func flagstone_floor(size: Vector3, theme: StringName, seed_value: int) -> StaticBody3D:
+	var body := collider(size, "floor")
+	var grout := MeshFactory.visual(MeshFactory.box(Vector3(size.x, 0.04, size.z), 1.2), PBRLibrary.wear(theme), "Grout")
+	grout.position = Vector3(0, size.y * 0.5 - 0.05, 0)
+	body.add_child(grout)
+	var visual := MeshFactory.visual(MeshFactory.flagstones(size, 1.0, seed_value), PBRLibrary.floor_mat(theme), "Flagstone")
+	visual.position = Vector3(0, size.y * 0.5 - 0.01, 0)
+	body.add_child(visual)
+	body.set_meta("asset_socket", "floor")
+	return body
+
+
+static func vaulted_ceiling(size: Vector3, theme: StringName, wall_h: float) -> Node3D:
+	var rise := clampf(wall_h * 0.34, 0.95, 1.7)
+	var root := Node3D.new()
+	root.name = "Vault"
+	root.set_meta("asset_socket", "ceiling")
+	var visual := MeshFactory.visual(MeshFactory.vault_ceiling(size, rise, 1.1, 8), PBRLibrary.ceiling(theme), "VaultMesh")
+	root.add_child(visual)
+	for i in 3:
+		var t := (float(i) / 2.0 - 0.5)
+		var rib := MeshFactory.visual(
+			MeshFactory.beveled_box(Vector3(size.x - 0.8, 0.12, 0.16), 0.02, 0.7),
+			PBRLibrary.trim(theme),
+			"VaultRib"
+		)
+		rib.position = Vector3(0, rise * 0.35, t * (size.z - 1.6))
+		root.add_child(rib)
+	return root
+
+
+static func rounded_corners(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float) -> void:
+	var inset := DD.ROOM_SIZE * 0.5 - 0.34
+	for offset in [Vector3(inset, 0, inset), Vector3(-inset, 0, inset), Vector3(inset, 0, -inset), Vector3(-inset, 0, -inset)]:
+		var col := MeshFactory.visual(MeshFactory.cylinder(0.46, wall_h, 16, 0.7), PBRLibrary.trim(theme), "CornerCol")
+		col.position = origin + offset + Vector3(0, wall_h * 0.5, 0)
+		col.set_meta("asset_socket", "corner")
+		parent.add_child(col)
+
+
+static func niches(parent: Node3D, origin: Vector3, room: RoomSpec, theme: StringName, wall_h: float) -> void:
+	var half := DD.ROOM_SIZE * 0.5 - 0.38
+	var placements: Array[Dictionary] = []
+	if not bool(room.doors.get("n", false)):
+		placements.append({"pos": origin + Vector3(-2.1, 1.35, -half + 0.12), "yaw": 0.0})
+	if not bool(room.doors.get("s", false)):
+		placements.append({"pos": origin + Vector3(2.0, 1.35, half - 0.12), "yaw": PI})
+	if not bool(room.doors.get("e", false)):
+		placements.append({"pos": origin + Vector3(half - 0.12, 1.4, -1.6), "yaw": -PI * 0.5})
+	if not bool(room.doors.get("w", false)):
+		placements.append({"pos": origin + Vector3(-half + 0.12, 1.4, 1.4), "yaw": PI * 0.5})
+	for spec in placements:
+		var root := Node3D.new()
+		root.name = "Niche"
+		root.position = spec["pos"]
+		root.rotation.y = spec["yaw"]
+		root.set_meta("asset_socket", "niche")
+		var recess := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.35, 1.7, 0.36), 0.05, 0.7), PBRLibrary.wear(theme), "NicheBack")
+		root.add_child(recess)
+		var frame := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.52, 1.88, 0.10), 0.04, 0.55), PBRLibrary.trim(theme), "NicheFrame")
+		frame.position = Vector3(0, 0, 0.18)
+		root.add_child(frame)
+		var shelf := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.05, 0.07, 0.2), 0.015, 0.5), PBRLibrary.trim(theme), "NicheShelf")
+		shelf.position = Vector3(0, -0.35, 0.04)
+		root.add_child(shelf)
+		parent.add_child(root)
+	var wet := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.6, 1.1, 0.04), 0.01, 0.6), PBRLibrary.wet(theme), "Moisture")
+	wet.position = origin + Vector3(-3.4, 0.55, -half + 0.22)
+	parent.add_child(wet)
+	if wall_h > 4.6:
+		var wet2 := MeshFactory.visual(MeshFactory.beveled_box(Vector3(1.2, 0.8, 0.04), 0.01, 0.6), PBRLibrary.wet(theme), "Moisture")
+		wet2.position = origin + Vector3(3.2, 0.7, half - 0.22)
+		parent.add_child(wet2)
+
+
 static func wall_run(parent: Node3D, center: Vector3, size: Vector3, has_door: bool, theme: StringName, dir: String) -> void:
 	if not has_door:
 		_paneled_wall(parent, center, size, theme, dir)
@@ -56,11 +131,11 @@ static func wall_run(parent: Node3D, center: Vector3, size: Vector3, has_door: b
 			lintel.position = center + Vector3(0, (size.y - lintel_h) * 0.5, 0)
 			parent.add_child(lintel)
 	_door_frame(parent, center, size, theme, axis_x)
-	_arch(parent, center, theme, dir)
+	_arch(parent, center, size, theme, dir)
 
 
-static func pillars(parent: Node3D, origin: Vector3, theme: StringName) -> void:
-	var inset := DD.ROOM_SIZE * 0.5 - 0.85
+static func pillars(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float = DD.WALL_HEIGHT) -> void:
+	var inset := DD.ROOM_SIZE * 0.5 - 3.35
 	for offset in [Vector3(inset, 0, inset), Vector3(-inset, 0, inset), Vector3(inset, 0, -inset), Vector3(-inset, 0, -inset)]:
 		var authored := AssetLibrary.instance(AssetLibrary.kit_path("pillar"))
 		var pillar: Node3D
@@ -69,14 +144,14 @@ static func pillars(parent: Node3D, origin: Vector3, theme: StringName) -> void:
 			pillar.name = "pillar"
 			_paint_tree(pillar, PBRLibrary.trim(theme))
 			pillar.position = origin + offset
-			pillar.scale = Vector3(1.0, DD.WALL_HEIGHT / 4.0, 1.0)
+			pillar.scale = Vector3(1.0, wall_h / 4.0, 1.0)
 		else:
-			pillar = MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.42, DD.WALL_HEIGHT, 0.42), 0.04, 0.7), PBRLibrary.trim(theme), "pillar")
-			pillar.position = origin + offset + Vector3(0, DD.WALL_HEIGHT * 0.5, 0)
+			pillar = MeshFactory.visual(MeshFactory.cylinder(0.18, wall_h, 12, 0.7), PBRLibrary.trim(theme), "pillar")
+			pillar.position = origin + offset + Vector3(0, wall_h * 0.5, 0)
 		parent.add_child(pillar)
 
 
-static func beams(parent: Node3D, origin: Vector3, theme: StringName) -> void:
+static func beams(parent: Node3D, origin: Vector3, theme: StringName, wall_h: float = DD.WALL_HEIGHT) -> void:
 	if theme == &"cavern":
 		return
 	for i in range(-2, 3):
@@ -86,7 +161,7 @@ static func beams(parent: Node3D, origin: Vector3, theme: StringName) -> void:
 			PBRLibrary.wood(),
 			"beam"
 		)
-		beam.position = origin + Vector3(0, DD.WALL_HEIGHT - 0.22, float(i) * 2.6)
+		beam.position = origin + Vector3(0, wall_h - 0.22, float(i) * 2.6)
 		parent.add_child(beam)
 
 
@@ -152,9 +227,9 @@ static func torch_at(parent: Node3D, position: Vector3, cast_shadow: bool) -> vo
 	parent.add_child(root)
 
 
-static func wall_torches(parent: Node3D, origin: Vector3, room: RoomSpec, theme: StringName) -> void:
+static func wall_torches(parent: Node3D, origin: Vector3, room: RoomSpec, theme: StringName, wall_h: float = DD.WALL_HEIGHT) -> void:
 	var half := DD.ROOM_SIZE * 0.5 - 0.38
-	var height := 2.25
+	var height := minf(2.25, wall_h * 0.55)
 	var placements: Array[Vector3] = []
 	if not bool(room.doors.get("n", false)):
 		placements.append(origin + Vector3(-2.8, height, -half))
@@ -172,8 +247,11 @@ static func wall_torches(parent: Node3D, origin: Vector3, room: RoomSpec, theme:
 		torch_at(parent, placements[i], i == key_idx)
 	if theme == &"cavern":
 		var drip := MeshFactory.visual(MeshFactory.cylinder(0.09, 0.7, 8, 0.5), PBRLibrary.wall(theme), "Stal")
-		drip.position = origin + Vector3(2.1, DD.WALL_HEIGHT - 0.4, 1.8)
+		drip.position = origin + Vector3(2.1, wall_h - 0.4, 1.8)
 		parent.add_child(drip)
+		var drip2 := MeshFactory.visual(MeshFactory.cylinder(0.12, 1.05, 8, 0.5), PBRLibrary.wall(theme), "Stal")
+		drip2.position = origin + Vector3(-2.4, wall_h - 0.55, -1.6)
+		parent.add_child(drip2)
 
 
 static func chest_visual() -> Node3D:
@@ -414,19 +492,24 @@ static func _door_frame(parent: Node3D, center: Vector3, size: Vector3, theme: S
 	parent.add_child(right)
 
 
-static func _arch(parent: Node3D, center: Vector3, theme: StringName, dir: String) -> void:
-	var authored := AssetLibrary.instance(AssetLibrary.kit_path("arch"))
-	var node: Node3D
-	if authored:
-		node = authored
-		node.name = "Arch"
-		_paint_tree(node, PBRLibrary.trim(theme))
-	else:
-		node = MeshFactory.visual(MeshFactory.beveled_box(Vector3(3.15, 0.28, 0.55), 0.04, 0.6), PBRLibrary.trim(theme), "Arch")
-	node.position = center + Vector3(0, DD.DOOR_HEIGHT - DD.WALL_HEIGHT * 0.5 + 0.08, 0)
+static func _arch(parent: Node3D, center: Vector3, size: Vector3, theme: StringName, dir: String) -> void:
+	var node := MeshFactory.visual(
+		MeshFactory.stone_arch(DD.DOOR_WIDTH + 0.7, 1.15, 0.52, 0.6),
+		PBRLibrary.trim(theme),
+		"Arch"
+	)
+	node.position = center + Vector3(0, -size.y * 0.5 + DD.DOOR_HEIGHT - 0.08, 0)
 	if dir == "e" or dir == "w":
 		node.rotation_degrees = Vector3(0, 90, 0)
 	parent.add_child(node)
+	var authored := AssetLibrary.instance(AssetLibrary.kit_path("arch"))
+	if authored:
+		authored.name = "KitArch"
+		_paint_tree(authored, PBRLibrary.trim(theme))
+		authored.position = node.position + Vector3(0, 0.18, 0)
+		if dir == "e" or dir == "w":
+			authored.rotation_degrees = Vector3(0, 90, 0)
+		parent.add_child(authored)
 
 
 static func _floor_dressing(parent: Node3D, origin: Vector3, theme: StringName, rng: RandomNumberGenerator) -> void:
@@ -437,6 +520,24 @@ static func _floor_dressing(parent: Node3D, origin: Vector3, theme: StringName, 
 	debris_at(parent, origin + Vector3(rng.randf_range(-4.6, -2.2), 0.0, rng.randf_range(2.4, 4.6)), theme, rng)
 	if rng.randf() < 0.6:
 		debris_at(parent, origin + Vector3(rng.randf_range(2.2, 4.6), 0.0, rng.randf_range(-4.6, -2.4)), theme, rng)
+	debris_at(parent, origin + Vector3(rng.randf_range(-1.8, 1.8), 0.0, rng.randf_range(-4.8, -3.6)), theme, rng)
+	var rubble := MeshFactory.visual(
+		MeshFactory.beveled_box(Vector3(rng.randf_range(0.55, 0.9), rng.randf_range(0.22, 0.38), rng.randf_range(0.4, 0.72)), 0.05, 0.55),
+		PBRLibrary.wear(theme),
+		"Rubble"
+	)
+	rubble.position = origin + Vector3(rng.randf_range(-3.2, -1.4), 0.14, rng.randf_range(-1.6, 1.6))
+	rubble.rotation_degrees = Vector3(rng.randf_range(-10, 10), rng.randf_range(0, 180), rng.randf_range(-8, 8))
+	parent.add_child(rubble)
+	if rng.randf() < 0.8:
+		var rubble2 := MeshFactory.visual(
+			MeshFactory.beveled_box(Vector3(rng.randf_range(0.4, 0.7), rng.randf_range(0.16, 0.3), rng.randf_range(0.32, 0.58)), 0.04, 0.55),
+			PBRLibrary.wear(theme),
+			"Rubble"
+		)
+		rubble2.position = origin + Vector3(rng.randf_range(1.2, 3.4), 0.12, rng.randf_range(-2.2, 2.2))
+		rubble2.rotation_degrees = Vector3(rng.randf_range(-8, 8), rng.randf_range(0, 180), rng.randf_range(-6, 6))
+		parent.add_child(rubble2)
 
 
 static func _banner_color(theme: StringName, rng: RandomNumberGenerator) -> Color:

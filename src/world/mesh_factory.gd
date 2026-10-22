@@ -79,6 +79,142 @@ static func visual(mesh: Mesh, material: Material, name: String = "BodyVisual") 
 	return mi
 
 
+static func flagstones(size: Vector3, tile: float, seed_value: int) -> ArrayMesh:
+	var key := "flags:%.2f:%.2f:%.3f:%d" % [size.x, size.z, tile, seed_value]
+	if _cache.has(key):
+		return _cache[key]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value if seed_value != 0 else 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cols := maxi(5, int(size.x / 1.05))
+	var rows := maxi(5, int(size.z / 1.05))
+	var hx := size.x * 0.5
+	var hz := size.z * 0.5
+	var col_w: PackedFloat32Array = PackedFloat32Array()
+	var row_h: PackedFloat32Array = PackedFloat32Array()
+	var col_sum := 0.0
+	var row_sum := 0.0
+	for _i in cols:
+		var w := rng.randf_range(0.62, 1.55)
+		col_w.append(w)
+		col_sum += w
+	for _i in rows:
+		var hgt := rng.randf_range(0.62, 1.55)
+		row_h.append(hgt)
+		row_sum += hgt
+	var x_cursor := -hx
+	for ix in cols:
+		var cell_x := size.x * (col_w[ix] / col_sum)
+		var z_cursor := -hz
+		for iz in rows:
+			var cell_z := size.z * (row_h[iz] / row_sum)
+			var gap := rng.randf_range(0.04, 0.09)
+			var x0 := x_cursor + gap + rng.randf_range(-0.08, 0.08)
+			var z0 := z_cursor + gap + rng.randf_range(-0.08, 0.08)
+			var x1 := x_cursor + cell_x - gap + rng.randf_range(-0.07, 0.07)
+			var z1 := z_cursor + cell_z - gap + rng.randf_range(-0.07, 0.07)
+			var y := rng.randf_range(0.0, 0.07)
+			var y00 := y
+			var y10 := y + rng.randf_range(-0.018, 0.018)
+			var y11 := y + rng.randf_range(-0.018, 0.018)
+			var y01 := y + rng.randf_range(-0.018, 0.018)
+			var a := Vector3(x0, y00, z0)
+			var b := Vector3(x1, y10, z0)
+			var c := Vector3(x1, y11, z1)
+			var d := Vector3(x0, y01, z1)
+			var nrm := (b - a).cross(d - a).normalized()
+			if nrm.y < 0.0:
+				nrm = -nrm
+			var uw := (x1 - x0) / maxf(0.05, tile)
+			var uh := (z1 - z0) / maxf(0.05, tile)
+			_tri(st, a, b, c, nrm, nrm, nrm, Vector2(0, uh), Vector2(uw, uh), Vector2(uw, 0))
+			_tri(st, a, c, d, nrm, nrm, nrm, Vector2(0, uh), Vector2(uw, 0), Vector2(0, 0))
+			var thick := 0.05
+			var a2 := a + Vector3(0, -thick, 0)
+			var b2 := b + Vector3(0, -thick, 0)
+			var c2 := c + Vector3(0, -thick, 0)
+			var d2 := d + Vector3(0, -thick, 0)
+			_quad(st, a2, b2, b, a, Vector3.FORWARD, x1 - x0, thick, tile)
+			_quad(st, d, c, c2, d2, Vector3.BACK, x1 - x0, thick, tile)
+			_quad(st, a, d, d2, a2, Vector3.LEFT, z1 - z0, thick, tile)
+			_quad(st, b2, c2, c, b, Vector3.RIGHT, z1 - z0, thick, tile)
+			z_cursor += cell_z
+		x_cursor += cell_x
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+static func stone_arch(span: float, rise: float, depth: float, tile: float = 0.65) -> ArrayMesh:
+	var key := "arch:%.2f:%.2f:%.2f:%.2f" % [span, rise, depth, tile]
+	if _cache.has(key):
+		return _cache[key]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var segs := 10
+	var hz := depth * 0.5
+	var thick := 0.38
+	for i in segs:
+		var a0 := PI * float(i) / float(segs)
+		var a1 := PI * float(i + 1) / float(segs)
+		var p0 := Vector3(cos(a0) * span * 0.5, sin(a0) * rise, 0)
+		var p1 := Vector3(cos(a1) * span * 0.5, sin(a1) * rise, 0)
+		var n0 := Vector3(cos(a0) * rise, sin(a0) * span * 0.5, 0).normalized()
+		var n1 := Vector3(cos(a1) * rise, sin(a1) * span * 0.5, 0).normalized()
+		var i0 := p0
+		var i1 := p1
+		var o0 := p0 + n0 * thick
+		var o1 := p1 + n1 * thick
+		var uw := span / maxf(0.05, tile) / float(segs)
+		var uh := rise / maxf(0.05, tile)
+		_quad(st, Vector3(i0.x, i0.y, hz), Vector3(i1.x, i1.y, hz), Vector3(o1.x, o1.y, hz), Vector3(o0.x, o0.y, hz), Vector3.BACK, uw, uh, tile)
+		_quad(st, Vector3(o0.x, o0.y, -hz), Vector3(o1.x, o1.y, -hz), Vector3(i1.x, i1.y, -hz), Vector3(i0.x, i0.y, -hz), Vector3.FORWARD, uw, uh, tile)
+		_quad(st, Vector3(o0.x, o0.y, hz), Vector3(o1.x, o1.y, hz), Vector3(o1.x, o1.y, -hz), Vector3(o0.x, o0.y, -hz), n0, uw, depth, tile)
+		_quad(st, Vector3(i1.x, i1.y, hz), Vector3(i0.x, i0.y, hz), Vector3(i0.x, i0.y, -hz), Vector3(i1.x, i1.y, -hz), -n0, uw, depth, tile)
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+static func vault_ceiling(size: Vector3, rise: float, tile: float, segs: int = 8) -> ArrayMesh:
+	var key := "vault:%.2f:%.2f:%.2f:%.2f:%d" % [size.x, size.z, rise, tile, segs]
+	if _cache.has(key):
+		return _cache[key]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hx := size.x * 0.5
+	var hz := size.z * 0.5
+	for iz in segs:
+		for ix in segs:
+			var u0 := float(ix) / float(segs)
+			var v0 := float(iz) / float(segs)
+			var u1 := float(ix + 1) / float(segs)
+			var v1 := float(iz + 1) / float(segs)
+			var p00 := _vault_point(u0, v0, hx, hz, rise)
+			var p10 := _vault_point(u1, v0, hx, hz, rise)
+			var p11 := _vault_point(u1, v1, hx, hz, rise)
+			var p01 := _vault_point(u0, v1, hx, hz, rise)
+			var nrm := (p10 - p00).cross(p01 - p00).normalized()
+			if nrm.y > 0.0:
+				nrm = -nrm
+			var uw := size.x / maxf(0.05, tile) / float(segs)
+			var uh := size.z / maxf(0.05, tile) / float(segs)
+			_tri(st, p00, p10, p11, nrm, nrm, nrm, Vector2(u0 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v1 * uh * float(segs)))
+			_tri(st, p00, p11, p01, nrm, nrm, nrm, Vector2(u0 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v1 * uh * float(segs)), Vector2(u0 * uw * float(segs), v1 * uh * float(segs)))
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+static func _vault_point(u: float, v: float, hx: float, hz: float, rise: float) -> Vector3:
+	var arch := sin(u * PI) * sin(v * PI)
+	return Vector3((u - 0.5) * hx * 2.0, rise * arch, (v - 0.5) * hz * 2.0)
+
+
 static func _bevel_box(st: SurfaceTool, hx: float, hy: float, hz: float, b: float, tile: float) -> void:
 	var ix := hx - b
 	var iy := hy - b

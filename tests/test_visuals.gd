@@ -42,6 +42,10 @@ static func run() -> DDTest:
 	t.assert_true(bone.albedo_texture != null, "bone has albedo map")
 	t.assert_true(PBRLibrary.cloth(Color(0.2, 0.1, 0.25)).albedo_texture != null, "cloth has albedo map")
 	t.assert_true(PBRLibrary.hide().albedo_texture != null, "hide has albedo map")
+	t.assert_true(PBRLibrary.skin().albedo_texture != null, "skin has albedo map")
+	t.assert_true(PBRLibrary.fur().albedo_texture != null, "fur has albedo map")
+	t.assert_true(PBRLibrary.fur().normal_enabled, "fur has normal detail")
+	t.assert_true(PBRLibrary.wet(&"crypt").roughness < 0.35, "wet stone is glossy")
 
 	# Runtime load so autoload names exist (`-s` compiles class_name deps before autoloads).
 	var monster_script: GDScript = load("res://src/monster/monster.gd")
@@ -65,6 +69,19 @@ static func run() -> DDTest:
 			t.assert_true(aabb.size.y < 2.5, "wolf height under 2.5m")
 			t.assert_true(aabb.position.y + aabb.size.y < 2.0, "wolf not parked in the sky")
 			t.assert_true(absf(vis.position.y) < 0.35, "wolf BodyVisual not lifted")
+			t.assert_true(_has_name_prefix(mob, "Fur") or _has_name_prefix(mob, "Wolf"), "wolf uses fur-named mesh")
+		if String(monster_def.id) == "cave_troll":
+			t.assert_true(_has_name_prefix(mob, "Skin"), "troll has skin parts")
+			t.assert_true(_has_name_prefix(mob, "Loin"), "troll has loincloth")
+			t.assert_true(_has_name_prefix(mob, "Skin_foot") or _has_name_prefix(mob, "Skin_toe"), "troll feet have toes")
+		if String(monster_def.id) == "skeleton":
+			t.assert_true(_has_name_prefix(mob, "Sword"), "skeleton holds a sword")
+			t.assert_true(_has_name_prefix(mob, "Armor_pauldron"), "skeleton has pauldrons")
+		if String(monster_def.id) == "lich":
+			t.assert_true(_has_name_prefix(mob, "Staff") or _has_name_prefix(mob, "Glow"), "lich has staff/orb")
+			t.assert_true(_has_name_prefix(mob, "Robe"), "lich has draped robe")
+		if String(monster_def.id) == "wraith":
+			t.assert_true(_has_name_prefix(mob, "Hood") or _has_name_prefix(mob, "Robe"), "wraith has cloth")
 		var anim := AssetLibrary.first_animation_player(mob)
 		t.assert_true(anim != null, "%s has AnimationPlayer" % monster_def.id)
 		for clip in ["idle", "walk", "attack", "hit", "death"]:
@@ -81,8 +98,36 @@ static func run() -> DDTest:
 	t.assert_true(markers.has("player"), "player marker after kit build")
 	t.assert_gt(float(world.get_child_count()), 8.0, "kit spawned nodes")
 	t.assert_true(_has_socket(world), "asset sockets remain")
+	t.assert_true(_has_named(world, "Flagstone") or _has_named(world, "Vault") or _has_named(world, "Niche"), "dungeon architecture present")
+	var start := blueprint.start_room()
+	var origin := start.world_origin()
+	var spawn: Vector3 = markers["player"]
+	t.assert_true(spawn.distance_to(origin) > 1.4, "crypt spawn is not room-center")
+	var yaw := float(markers["player_yaw"])
+	var look := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var inward: Vector3 = origin - spawn
+	inward.y = 0.0
+	t.assert_true(look.dot(inward.normalized()) > 0.25, "crypt spawn faces into the room")
 	world.free()
 	return t
+
+
+static func _has_name_prefix(node: Node, prefix: String) -> bool:
+	if String(node.name).begins_with(prefix):
+		return true
+	for child in node.get_children():
+		if _has_name_prefix(child, prefix):
+			return true
+	return false
+
+
+static func _has_named(node: Node, name: String) -> bool:
+	if String(node.name) == name:
+		return true
+	for child in node.get_children():
+		if _has_named(child, name):
+			return true
+	return false
 
 
 static func _has_socket(node: Node) -> bool:

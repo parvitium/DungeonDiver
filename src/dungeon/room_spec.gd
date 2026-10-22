@@ -17,17 +17,53 @@ func world_center() -> Vector3:
 	return world_origin() + Vector3(0.0, 0.0, 0.0)
 
 
+func entrance_key() -> String:
+	for key in ["n", "e", "s", "w"]:
+		if bool(doors.get(key, false)):
+			return key
+	return "n"
+
+
 func facing_yaw() -> float:
-	# Default Node3D forward is -Z, which is north in this generator.
-	if bool(doors.get("n", false)):
-		return 0.0
-	if bool(doors.get("e", false)):
-		return -PI * 0.5
-	if bool(doors.get("s", false)):
-		return PI
-	if bool(doors.get("w", false)):
-		return PI * 0.5
-	return 0.0
+	# Stand just inside the entrance and look into the room, not at the wall.
+	match entrance_key():
+		"n":
+			return PI
+		"e":
+			return PI * 0.5
+		"s":
+			return 0.0
+		"w":
+			return -PI * 0.5
+		_:
+			return 0.0
+
+
+func spawn_offset() -> Vector3:
+	var inset := DD.ROOM_SIZE * 0.5 - 2.55
+	match entrance_key():
+		"n":
+			return Vector3(0.0, 0.05, -inset)
+		"e":
+			return Vector3(inset, 0.05, 0.0)
+		"s":
+			return Vector3(0.0, 0.05, inset)
+		"w":
+			return Vector3(-inset, 0.05, 0.0)
+		_:
+			return Vector3(0.0, 0.05, 0.0)
+
+
+func wall_height() -> float:
+	match kind:
+		DD.RoomKind.START:
+			return 3.55
+		DD.RoomKind.TREASURE:
+			return 3.9
+		DD.RoomKind.BOSS:
+			return 5.35
+		_:
+			return DD.WALL_HEIGHT
 
 
 func to_dict() -> Dictionary:

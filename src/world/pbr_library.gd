@@ -24,7 +24,7 @@ static func meters_to_uv(meters: float) -> Vector3:
 static func wall(theme: StringName) -> StandardMaterial3D:
 	if theme == &"cavern":
 		return _pbr("cavern_rock", Color(0.88, 0.84, 0.76), 0.92, 0.0, METERS_ROCK, 1.05)
-	return _pbr("crypt_brick", Color(0.92, 0.93, 0.94), 0.86, 0.0, METERS_BRICK, 1.0)
+	return _pbr("crypt_brick", Color(1.0, 0.98, 0.94), 0.84, 0.0, METERS_BRICK, 1.05)
 
 
 static func floor_mat(theme: StringName) -> StandardMaterial3D:
@@ -36,7 +36,7 @@ static func floor_mat(theme: StringName) -> StandardMaterial3D:
 static func ceiling(theme: StringName) -> StandardMaterial3D:
 	if theme == &"cavern":
 		return _pbr("cavern_rock", Color(0.70, 0.68, 0.60), 0.96, 0.0, METERS_ROCK, 0.7)
-	return _pbr("crypt_brick", Color(0.74, 0.76, 0.80), 0.92, 0.0, METERS_BRICK, 0.65)
+	return _pbr("crypt_brick", Color(0.88, 0.86, 0.80), 0.88, 0.0, METERS_BRICK, 0.7)
 
 
 static func wood() -> StandardMaterial3D:
@@ -81,7 +81,23 @@ static func hide() -> StandardMaterial3D:
 
 
 static func skin() -> StandardMaterial3D:
-	return hide()
+	return _pbr("skin", Color(0.82, 0.78, 0.52), 0.62, 0.0, 0.48, 1.55)
+
+
+static func fur() -> StandardMaterial3D:
+	return _pbr("fur", Color(0.78, 0.62, 0.42), 0.88, 0.0, 0.42, 1.55)
+
+
+static func wet(theme: StringName) -> StandardMaterial3D:
+	var key := "wet:%s" % String(theme)
+	if _cache.has(key):
+		return _cache[key]
+	var mat := wall(theme).duplicate() as StandardMaterial3D
+	mat.roughness = 0.22
+	mat.metallic = 0.16
+	mat.albedo_color = mat.albedo_color.darkened(0.28)
+	_cache[key] = mat
+	return mat
 
 
 static func puddle() -> StandardMaterial3D:

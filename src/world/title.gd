@@ -39,11 +39,12 @@ func _build_hall() -> void:
 	var height := DD.WALL_HEIGHT
 	var half_w := width * 0.5
 	var origin := Vector3(0, 0, -4.0)
-	var floor := DungeonKit.slab(Vector3(width, 0.35, length), PBRLibrary.floor_mat(theme), "floor", 1.0)
+	var floor := DungeonKit.flagstone_floor(Vector3(width, 0.35, length), theme, 2026)
 	floor.position = origin + Vector3(0, -0.175, 0)
 	add_child(floor)
-	var ceiling := DungeonKit.slab(Vector3(width, 0.3, length), PBRLibrary.ceiling(theme), "ceiling", 1.0)
-	ceiling.position = origin + Vector3(0, height + 0.15, 0)
+	var ceiling := DungeonKit.vaulted_ceiling(Vector3(width, 0.28, length), theme, height)
+	var rise := clampf(height * 0.34, 0.95, 1.7)
+	ceiling.position = origin + Vector3(0, height - rise + 0.12, 0)
 	add_child(ceiling)
 	DungeonKit.wall_run(self, origin + Vector3(half_w, height * 0.5, 0), Vector3(DD.WALL_THICKNESS, height, length), false, theme, "e")
 	DungeonKit.wall_run(self, origin + Vector3(-half_w, height * 0.5, 0), Vector3(DD.WALL_THICKNESS, height, length), false, theme, "w")

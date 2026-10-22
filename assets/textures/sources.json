@@ -7,5 +7,7 @@
   "metal": "rusty_metal_02",
   "bone": "plaster_stone_wall_01",
   "cloth": "hessian_230",
-  "hide": "brown_leather"
+  "hide": "brown_leather",
+  "skin": "original_troll_skin",
+  "fur": "original_wolf_fur"
 }

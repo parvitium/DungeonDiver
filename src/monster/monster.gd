@@ -220,32 +220,36 @@ func _mat_for_part(part_name: String) -> StandardMaterial3D:
 		if def and String(def.id) == "wraith":
 			return PBRLibrary.emissive(Color(0.45, 0.82, 0.95), 2.4)
 		if def and String(def.id) == "lich":
-			return PBRLibrary.emissive(Color(0.62, 0.28, 0.95), 2.8)
+			return PBRLibrary.emissive(Color(0.62, 0.28, 0.95), 3.2)
 		return PBRLibrary.emissive(Color(0.85, 0.2, 0.15), 1.8)
 	if n.begins_with("armor") or n.begins_with("metal") or n.begins_with("sword") or n.begins_with("crown") or n.begins_with("helm"):
 		return PBRLibrary.metal()
 	if n.begins_with("wood") or n.begins_with("staff") or n.begins_with("club"):
 		return PBRLibrary.wood()
-	if n.begins_with("robe") or n.begins_with("cloth") or n.begins_with("hood") or n.begins_with("tatter"):
+	if n.begins_with("robe") or n.begins_with("cloth") or n.begins_with("hood") or n.begins_with("tatter") or n.begins_with("loin"):
 		if def and String(def.id) == "wraith":
-			var ghost := PBRLibrary.cloth(Color(0.50, 0.74, 0.86, 0.58))
+			var ghost := PBRLibrary.cloth(Color(0.68, 0.72, 0.74, 0.84))
 			ghost = ghost.duplicate() as StandardMaterial3D
 			ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			ghost.albedo_color = Color(0.50, 0.74, 0.86, 0.58)
+			ghost.albedo_color = Color(0.72, 0.74, 0.76, 0.92)
 			ghost.emission_enabled = true
-			ghost.emission = Color(0.32, 0.62, 0.78)
-			ghost.emission_energy_multiplier = 0.45
+			ghost.emission = Color(0.16, 0.20, 0.22)
+			ghost.emission_energy_multiplier = 0.08
 			ghost.cull_mode = BaseMaterial3D.CULL_DISABLED
 			return ghost
-		return PBRLibrary.cloth(Color(0.22, 0.10, 0.28) if def and String(def.id) == "lich" else Color(0.24, 0.14, 0.11))
-	if n.begins_with("fur") or n.begins_with("hide"):
-		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.62, 0.46, 0.30) if def and String(def.id) == "cave_wolf" else Color(0.42, 0.48, 0.28))
+		return PBRLibrary.cloth(Color(0.22, 0.10, 0.28) if def and String(def.id) == "lich" else Color(0.28, 0.16, 0.10))
+	if n.begins_with("fur"):
+		return PBRLibrary.fur()
+	if n.begins_with("skin") or n.begins_with("wart") or n.begins_with("scar"):
+		return PBRLibrary.skin()
+	if n.begins_with("hide"):
+		return PBRLibrary.tinted(PBRLibrary.skin(), Color(0.48, 0.56, 0.34))
 	if n.begins_with("stone") or n.begins_with("rock"):
 		return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.40, 0.46, 0.34))
 	if def and String(def.id) == "cave_troll" and (n.begins_with("bone") == false):
-		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.40, 0.48, 0.30))
+		return PBRLibrary.skin()
 	if def and String(def.id) == "cave_wolf":
-		return PBRLibrary.tinted(PBRLibrary.hide(), Color(0.55, 0.40, 0.26))
+		return PBRLibrary.fur()
 	return PBRLibrary.tinted(PBRLibrary.bone(), Color(0.90, 0.84, 0.70))
 
 
@@ -255,8 +259,25 @@ func _paint_named(node: Node) -> void:
 	if node is MeshInstance3D:
 		(node as MeshInstance3D).material_override = _mat_for_part(String(node.name))
 		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		_attach_orb_glow(node as MeshInstance3D)
 	for child in node.get_children():
 		_paint_named(child)
+
+
+func _attach_orb_glow(mi: MeshInstance3D) -> void:
+	var n := String(mi.name).to_lower()
+	if not n.begins_with("glow"):
+		return
+	if mi.get_node_or_null("OrbGlow") != null:
+		return
+	var lamp := OmniLight3D.new()
+	lamp.name = "OrbGlow"
+	lamp.light_color = Color(0.62, 0.28, 0.95) if def and String(def.id) == "lich" else Color(0.45, 0.82, 0.95)
+	lamp.light_energy = 3.6
+	lamp.omni_range = 2.4
+	lamp.omni_attenuation = 1.1
+	lamp.shadow_enabled = false
+	mi.add_child(lamp)
 
 
 func _update_visual(delta: float) -> void:
