@@ -8,7 +8,7 @@ Downloaded as 1K JPG (albedo / OpenGL normal / roughness / AO).
 
 | Folder | Asset | URL |
 | --- | --- | --- |
-| `assets/textures/crypt_brick/` | castle_brick_02_red | https://polyhaven.com/a/castle_brick_02_red |
+| `assets/textures/crypt_brick/` | stone_brick_wall_001 | https://polyhaven.com/a/stone_brick_wall_001 |
 | `assets/textures/crypt_floor/` | cobblestone_floor_04 | https://polyhaven.com/a/cobblestone_floor_04 |
 | `assets/textures/cavern_rock/` | rock_wall_10 | https://polyhaven.com/a/rock_wall_10 |
 | `assets/textures/cavern_floor/` | forest_ground_04 | https://polyhaven.com/a/forest_ground_04 |

@@ -48,10 +48,12 @@ func sync_home() -> void:
 func _build() -> void:
 	var capsule := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
-	shape.radius = 0.4
-	shape.height = 1.6
+	var sy := def.scale.y if def else 1.0
+	var sx := maxf(def.scale.x, def.scale.z) if def else 1.0
+	shape.radius = 0.4 * sx
+	shape.height = 1.7 * sy
 	capsule.shape = shape
-	capsule.position = Vector3(0, 0.8, 0)
+	capsule.position = Vector3(0, shape.height * 0.5, 0)
 	add_child(capsule)
 
 	_visual = _make_body()
@@ -59,9 +61,9 @@ func _build() -> void:
 	_anim = AssetLibrary.first_animation_player(_visual)
 	AssetLibrary.play_if_has(_anim, "idle")
 
-	if def and def.is_boss and _visual.get_node_or_null("Crown") == null:
-		var crown := MeshFactory.visual(MeshFactory.box(Vector3(0.55, 0.12, 0.55), 0.4), PBRLibrary.metal(), "Crown")
-		crown.position = Vector3(0, 1.85, 0)
+	if def and def.is_boss and _visual.get_node_or_null("Crown") == null and String(def.id) == "cave_troll":
+		var crown := MeshFactory.visual(MeshFactory.beveled_box(Vector3(0.42, 0.1, 0.42), 0.02, 0.4), PBRLibrary.metal(), "Crown")
+		crown.position = Vector3(0, 2.05 * (def.scale.y if def else 1.0), 0)
 		add_child(crown)
 
 	_agent = NavigationAgent3D.new()
@@ -74,7 +76,7 @@ func _build() -> void:
 
 	var label := Label3D.new()
 	label.text = def.display_name if def else "Monster"
-	label.position = Vector3(0, 1.85, 0)
+	label.position = Vector3(0, 1.85 * (def.scale.y if def else 1.0), 0)
 	label.font_size = 28
 	label.modulate = Color(1, 0.9, 0.75)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -203,37 +205,45 @@ func _make_body() -> Node3D:
 
 
 func _paint_creature(root: Node) -> void:
-	var mat := _creature_material()
-	_paint(root, mat)
+	_paint_named(root)
 
 
-func _creature_material() -> StandardMaterial3D:
-	if def == null:
-		return PBRLibrary.bone()
-	match String(def.id):
-		"skeleton":
-			return PBRLibrary.tinted(PBRLibrary.bone(), Color(0.9, 0.86, 0.74))
-		"cave_wolf":
-			return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.42, 0.28, 0.18))
-		"wraith":
-			var ghost := PBRLibrary.emissive(Color(0.35, 0.7, 0.85), 1.4)
+func _mat_for_part(part_name: String) -> StandardMaterial3D:
+	var n := part_name.to_lower()
+	if n.begins_with("glow") or n.begins_with("eye") or n.begins_with("orb") or n.begins_with("cavity"):
+		if def and String(def.id) == "wraith":
+			return PBRLibrary.emissive(Color(0.45, 0.82, 0.95), 2.4)
+		if def and String(def.id) == "lich":
+			return PBRLibrary.emissive(Color(0.62, 0.28, 0.95), 2.8)
+		return PBRLibrary.emissive(Color(0.85, 0.2, 0.15), 1.8)
+	if n.begins_with("armor") or n.begins_with("metal") or n.begins_with("sword") or n.begins_with("crown") or n.begins_with("helm"):
+		return PBRLibrary.metal()
+	if n.begins_with("wood") or n.begins_with("staff") or n.begins_with("club"):
+		return PBRLibrary.wood()
+	if n.begins_with("robe") or n.begins_with("cloth") or n.begins_with("hood") or n.begins_with("tatter"):
+		if def and String(def.id) == "wraith":
+			var ghost := PBRLibrary.emissive(Color(0.38, 0.68, 0.82), 0.55)
 			ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			ghost.albedo_color = Color(0.45, 0.75, 0.9, 0.55)
+			ghost.albedo_color = Color(0.42, 0.68, 0.82, 0.48)
 			return ghost
-		"lich":
-			return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.28, 0.12, 0.32))
-		"cave_troll":
-			return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.38, 0.48, 0.3))
-		_:
-			return PBRLibrary.tinted(PBRLibrary.bone(), def.color)
+		return PBRLibrary.cloth(Color(0.18, 0.08, 0.24) if def and String(def.id) == "lich" else Color(0.22, 0.12, 0.10))
+	if n.begins_with("fur") or n.begins_with("hide"):
+		return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.38, 0.26, 0.16))
+	if n.begins_with("stone") or n.begins_with("rock"):
+		return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.40, 0.46, 0.34))
+	if def and String(def.id) == "cave_troll" and (n.begins_with("bone") == false):
+		return PBRLibrary.tinted(PBRLibrary.wall(&"cavern"), Color(0.36, 0.46, 0.30))
+	if def and String(def.id) == "cave_wolf":
+		return PBRLibrary.tinted(PBRLibrary.wood(), Color(0.40, 0.28, 0.18))
+	return PBRLibrary.tinted(PBRLibrary.bone(), Color(0.90, 0.84, 0.70))
 
 
-func _paint(node: Node, material: Material) -> void:
+func _paint_named(node: Node) -> void:
 	if node is MeshInstance3D:
-		(node as MeshInstance3D).material_override = material
+		(node as MeshInstance3D).material_override = _mat_for_part(String(node.name))
 		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for child in node.get_children():
-		_paint(child, material)
+		_paint_named(child)
 
 
 func _update_visual(delta: float) -> void:

@@ -72,9 +72,9 @@ func _build_rig() -> void:
 	var lamp := OmniLight3D.new()
 	lamp.name = "ViewLamp"
 	lamp.position = Vector3(0.15, -0.05, -0.25)
-	lamp.light_color = Color(1.0, 0.82, 0.6)
+	lamp.light_color = Color(0.78, 0.84, 0.92)
 	lamp.light_energy = 0.55
-	lamp.omni_range = 2.8
+	lamp.omni_range = 3.4
 	lamp.shadow_enabled = false
 	head.add_child(lamp)
 	var settings := get_node_or_null("/root/SettingsService")

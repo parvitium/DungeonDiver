@@ -61,27 +61,27 @@ static func all_monsters() -> Array[MonsterDef]:
 	monsters.append(_monster(
 		&"skeleton", "Skeleton", "Rattling patrols of the crypt.",
 		false, 42.0, 8.0, 3.0, 1.7, 1.15, 9.0, 15.0, false, 0.0,
-		&"crypt_drops", 0.75, Color(0.85, 0.84, 0.78), Vector3(0.9, 1.15, 0.9)
+		&"crypt_drops", 0.75, Color(0.85, 0.84, 0.78), Vector3.ONE
 	))
 	monsters.append(_monster(
 		&"cave_wolf", "Cave Wolf", "Hunts in the dark between stalagmites.",
 		false, 34.0, 9.0, 5.2, 1.6, 0.9, 12.0, 18.0, false, 0.0,
-		&"cavern_drops", 0.7, Color(0.45, 0.32, 0.22), Vector3(1.15, 0.7, 1.4)
+		&"cavern_drops", 0.7, Color(0.45, 0.32, 0.22), Vector3.ONE
 	))
 	monsters.append(_monster(
 		&"wraith", "Wraith", "A cold light that throws bolts of night.",
 		false, 48.0, 7.0, 2.6, 8.5, 1.6, 11.0, 17.0, true, 16.0,
-		&"mixed_drops", 0.8, Color(0.45, 0.75, 0.9), Vector3(0.85, 1.4, 0.85)
+		&"mixed_drops", 0.8, Color(0.45, 0.75, 0.9), Vector3.ONE
 	))
 	monsters.append(_monster(
 		&"lich", "Crypt Lich", "The reason the crypt still has a king.",
 		true, 170.0, 14.0, 2.4, 9.0, 1.35, 14.0, 22.0, true, 15.0,
-		&"boss_drops", 1.0, Color(0.55, 0.2, 0.75), Vector3(1.1, 1.6, 1.1)
+		&"boss_drops", 1.0, Color(0.55, 0.2, 0.75), Vector3(1.06, 1.06, 1.06)
 	))
 	monsters.append(_monster(
 		&"cave_troll", "Cave Troll", "A walking boulder with opinions.",
 		true, 210.0, 16.0, 2.8, 2.4, 1.5, 11.0, 18.0, false, 0.0,
-		&"boss_drops", 1.0, Color(0.35, 0.5, 0.32), Vector3(1.6, 1.8, 1.4)
+		&"boss_drops", 1.0, Color(0.35, 0.5, 0.32), Vector3(1.18, 1.18, 1.18)
 	))
 	return monsters
 
@@ -100,11 +100,11 @@ static func all_dungeons() -> Array[DungeonTypeDef]:
 	crypt.boss_id = &"lich"
 	crypt.loot_table_id = &"crypt_drops"
 	crypt.chest_chance = 0.4
-	crypt.floor_color = Color(0.18, 0.17, 0.16)
-	crypt.wall_color = Color(0.12, 0.12, 0.13)
+	crypt.floor_color = Color(0.18, 0.18, 0.19)
+	crypt.wall_color = Color(0.16, 0.16, 0.17)
 	crypt.accent_color = Color(0.52, 0.28, 0.72)
-	crypt.fog_color = Color(0.04, 0.03, 0.06)
-	crypt.light_color = Color(0.72, 0.5, 1.0)
+	crypt.fog_color = Color(0.05, 0.055, 0.07)
+	crypt.light_color = Color(0.58, 0.68, 0.82)
 	dungeons.append(crypt)
 
 	var cavern := DungeonTypeDef.new()
@@ -119,11 +119,11 @@ static func all_dungeons() -> Array[DungeonTypeDef]:
 	cavern.boss_id = &"cave_troll"
 	cavern.loot_table_id = &"cavern_drops"
 	cavern.chest_chance = 0.32
-	cavern.floor_color = Color(0.22, 0.16, 0.12)
-	cavern.wall_color = Color(0.16, 0.12, 0.09)
+	cavern.floor_color = Color(0.20, 0.18, 0.14)
+	cavern.wall_color = Color(0.16, 0.15, 0.12)
 	cavern.accent_color = Color(0.25, 0.7, 0.65)
-	cavern.fog_color = Color(0.06, 0.05, 0.04)
-	cavern.light_color = Color(1.0, 0.62, 0.32)
+	cavern.fog_color = Color(0.05, 0.055, 0.05)
+	cavern.light_color = Color(0.55, 0.62, 0.56)
 	dungeons.append(cavern)
 	return dungeons
 

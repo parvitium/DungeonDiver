@@ -1,9 +1,9 @@
 class_name TorchLight
 extends OmniLight3D
-## Warm flickering torch. Particles are skipped on headless boots.
+## Warm flickering torch with tight falloff. Particles skip on headless boots.
 
 
-var base_energy: float = 2.8
+var base_energy: float = 2.6
 var _phase: float = 0.0
 
 
@@ -11,8 +11,9 @@ func _ready() -> void:
 	_phase = randf() * TAU
 	light_color = Color(1.0, 0.62, 0.28)
 	light_energy = base_energy
-	omni_range = 9.5
-	omni_attenuation = 1.15
+	if omni_range < 0.1:
+		omni_range = 7.2
+	omni_attenuation = 1.85
 	VisualLook.configure_omni(self, true)
 	if not VisualLook.is_headless():
 		_embers()
@@ -20,15 +21,15 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_phase += delta * (7.5 + base_energy)
-	var flicker := 0.82 + 0.12 * sin(_phase) + 0.08 * sin(_phase * 2.37 + 1.1)
+	var flicker := 0.84 + 0.10 * sin(_phase) + 0.06 * sin(_phase * 2.37 + 1.1)
 	light_energy = base_energy * flicker
 
 
 func _embers() -> void:
 	var dust := GPUParticles3D.new()
 	dust.name = "Embers"
-	dust.amount = 18
-	dust.lifetime = 1.3
+	dust.amount = 22
+	dust.lifetime = 1.4
 	dust.preprocess = 0.4
 	dust.visibility_aabb = AABB(Vector3(-0.6, -0.2, -0.6), Vector3(1.2, 1.8, 1.2))
 	var mat := ParticleProcessMaterial.new()

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -14,7 +15,7 @@ OUT = ROOT / "assets" / "textures"
 
 # dest_folder -> polyhaven asset id
 POLYHAVEN = {
-    "crypt_brick": "castle_brick_02_red",
+    "crypt_brick": "stone_brick_wall_001",
     "crypt_floor": "cobblestone_floor_04",
     "cavern_rock": "rock_wall_10",
     "cavern_floor": "forest_ground_04",
@@ -25,6 +26,7 @@ POLYHAVEN = {
 
 # fallbacks if a Poly Haven id 404s
 POLYHAVEN_FALLBACK = {
+    "crypt_brick": ["brick_wall_02", "castle_brick_07", "plastered_stone_wall"],
     "crypt_floor": ["cobblestone_floor_13", "cobblestone_01", "paving_stones_22"],
     "cavern_rock": ["rock_wall_08", "rock_face", "rock_06"],
     "cavern_floor": ["forest_ground_03", "aerial_rocks_02", "dirt_floor"],
@@ -51,7 +53,8 @@ def fetch_json(url: str) -> dict:
 
 def download(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists() and dest.stat().st_size > 1024:
+    force = os.environ.get("DD_FORCE_TEXTURES") == "1"
+    if dest.exists() and dest.stat().st_size > 1024 and not force:
         print(f"  skip {dest.relative_to(ROOT)}")
         return
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})

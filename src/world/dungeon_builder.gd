@@ -79,11 +79,14 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: 
 
 func _room_key_light(parent: Node3D, origin: Vector3, room: RoomSpec, def: DungeonTypeDef) -> void:
 	var key := OmniLight3D.new()
-	key.name = "RoomKey"
-	key.position = origin + Vector3(0, 2.55, 0)
-	key.light_color = def.light_color.lerp(Color(1.0, 0.72, 0.42), 0.55) if def else Color(1.0, 0.7, 0.4)
-	key.light_energy = 5.2 if room.kind == DD.RoomKind.BOSS else 3.8
-	key.omni_range = 13.0
-	key.omni_attenuation = 0.9
-	VisualLook.configure_omni(key, room.kind == DD.RoomKind.START or room.kind == DD.RoomKind.BOSS)
+	key.name = "RoomFill"
+	key.position = origin + Vector3(0, 3.1, 0)
+	var cool := Color(0.52, 0.64, 0.80)
+	if def != null and String(def.id) == "cavern":
+		cool = Color(0.48, 0.60, 0.56)
+	key.light_color = cool
+	key.light_energy = 2.4 if room.kind == DD.RoomKind.BOSS else 1.7
+	key.omni_range = 10.0
+	key.omni_attenuation = 1.15
+	VisualLook.configure_omni(key, false)
 	parent.add_child(key)

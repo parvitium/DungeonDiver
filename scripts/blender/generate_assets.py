@@ -8,7 +8,7 @@ import os
 import sys
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Vector
 
 OUT = os.environ.get("DD_MESH_OUT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "assets", "meshes")))
 
@@ -31,6 +31,8 @@ def shade_smooth(obj: bpy.types.Object) -> None:
 
 
 def bevel(obj: bpy.types.Object, width: float = 0.012, segments: int = 2) -> None:
+    if obj.type != "MESH":
+        return
     mod = obj.modifiers.new(name="Bevel", type="BEVEL")
     mod.width = width
     mod.segments = segments
@@ -41,19 +43,9 @@ def bevel(obj: bpy.types.Object, width: float = 0.012, segments: int = 2) -> Non
     obj.select_set(False)
 
 
-def subdivide(obj: bpy.types.Object, levels: int = 1) -> None:
-    if levels <= 0:
-        return
-    mod = obj.modifiers.new(name="Subsurf", type="SUBSURF")
-    mod.levels = levels
-    mod.render_levels = levels
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    obj.select_set(False)
-
-
 def unwrap(obj: bpy.types.Object) -> None:
+    if obj.type != "MESH":
+        return
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT")
@@ -67,6 +59,7 @@ def unwrap(obj: bpy.types.Object) -> None:
 
 
 def join(objects: list[bpy.types.Object], name: str) -> bpy.types.Object:
+    objects = [o for o in objects if o is not None]
     if not objects:
         raise RuntimeError("join empty")
     bpy.ops.object.select_all(action="DESELECT")
@@ -116,6 +109,13 @@ def mesh_torus(major, minor, loc=(0, 0, 0), rot=(0, 0, 0), name="Torus") -> bpy.
     return obj
 
 
+def apply_scale(obj: bpy.types.Object) -> None:
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.select_set(False)
+
+
 def export_glb(obj: bpy.types.Object, rel: str) -> None:
     path = os.path.join(OUT, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -137,23 +137,32 @@ def export_glb(obj: bpy.types.Object, rel: str) -> None:
         export_skins=True,
         export_yup=True,
     )
-    print("exported", path, "verts", len(obj.data.vertices) if obj.type == "MESH" else 0)
+    print("exported", path)
 
 
-def finish_mesh(obj: bpy.types.Object, do_bevel: bool = True, sub: int = 0) -> bpy.types.Object:
+def triangulate(obj: bpy.types.Object) -> None:
+    if obj.type != "MESH":
+        return
+    mod = obj.modifiers.new(name="Tri", type="TRIANGULATE")
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    obj.select_set(False)
+
+
+def finish_mesh(obj: bpy.types.Object, do_bevel: bool = True, width: float = 0.01) -> bpy.types.Object:
     if do_bevel:
-        bevel(obj, 0.01, 2)
-    if sub:
-        subdivide(obj, sub)
+        bevel(obj, width, 2)
+    triangulate(obj)
     shade_smooth(obj)
     unwrap(obj)
     return obj
 
 
-def add_simple_armature(mesh: bpy.types.Object, bones: list[tuple], actions: dict) -> bpy.types.Object:
+def add_simple_armature(meshes: list[bpy.types.Object], bones: list[tuple], actions: dict) -> bpy.types.Object:
     bpy.ops.object.armature_add(enter_editmode=True, location=(0, 0, 0))
     arm = bpy.context.active_object
-    arm.name = mesh.name + "_Arm"
+    arm.name = "Armature"
     eb = arm.data.edit_bones
     root = eb[0]
     root.name = bones[0][0]
@@ -169,7 +178,8 @@ def add_simple_armature(mesh: bpy.types.Object, bones: list[tuple], actions: dic
         created[name] = bone
     bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.select_all(action="DESELECT")
-    mesh.select_set(True)
+    for mesh in meshes:
+        mesh.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
@@ -191,132 +201,54 @@ def add_simple_armature(mesh: bpy.types.Object, bones: list[tuple], actions: dic
     return arm
 
 
-def make_pillar() -> None:
-    reset()
-    base = mesh_cube((0.55, 0.55, 0.18), (0, 0, 0.09), name="Base")
-    shaft = mesh_cyl(0.16, 3.6, (0, 0, 2.0), verts=12, name="Shaft")
-    cap = mesh_cube((0.5, 0.5, 0.16), (0, 0, 3.92), name="Cap")
-    neck = mesh_cyl(0.2, 0.18, (0, 0, 3.72), verts=12, name="Neck")
-    obj = join([base, shaft, cap, neck], "pillar")
-    finish_mesh(obj)
-    export_glb(obj, "kit/pillar.glb")
+def long_bone(r: float, length: float, loc, rot, name: str) -> list[bpy.types.Object]:
+    shaft = mesh_cyl(r, length, loc, rot, verts=8, name=name)
+    orient = Euler(rot, "XYZ").to_matrix()
+    half = orient @ Vector((0.0, 0.0, length * 0.5))
+    center = Vector(loc)
+    j1 = mesh_uvsphere(r * 1.38, tuple(center + half), name + "J1", 8, 6)
+    j2 = mesh_uvsphere(r * 1.28, tuple(center - half), name + "J2", 8, 6)
+    return [shaft, j1, j2]
 
 
-def make_arch() -> None:
-    reset()
-    parts = []
-    # horseshoe of blocks
-    for i in range(-4, 5):
-        t = i / 4.0
-        ang = math.pi * 0.5 * t
-        x = math.sin(ang) * 1.45
-        z = 2.55 + math.cos(ang) * 0.55
-        block = mesh_cube((0.38, 0.42, 0.28), (x, 0, z), (0, 0, -ang * 0.35), name=f"V{i}")
-        parts.append(block)
-    left = mesh_cube((0.22, 0.42, 2.4), (-1.5, 0, 1.2), name="L")
-    right = mesh_cube((0.22, 0.42, 2.4), (1.5, 0, 1.2), name="R")
-    obj = join(parts + [left, right], "arch")
-    finish_mesh(obj)
-    export_glb(obj, "kit/arch.glb")
+def curve_rib(z: float, side: float, name: str, radius: float = 0.15, depth: float = 0.085) -> bpy.types.Object:
+    curve_data = bpy.data.curves.new(name, type="CURVE")
+    curve_data.dimensions = "3D"
+    curve_data.bevel_depth = 0.010
+    curve_data.bevel_resolution = 1
+    curve_data.fill_mode = "FULL"
+    spline = curve_data.splines.new("POLY")
+    count = 8
+    spline.points.add(count - 1)
+    for i in range(count):
+        t = i / (count - 1) * math.pi
+        x = side * radius * math.sin(t)
+        y = depth * math.cos(t)
+        zz = z + 0.012 * math.sin(t)
+        spline.points[i].co = (x, y, zz, 1.0)
+    obj = bpy.data.objects.new(name, curve_data)
+    bpy.context.collection.objects.link(obj)
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.convert(target="MESH")
+    return bpy.context.active_object
 
 
-def make_beam() -> None:
-    reset()
-    beam = mesh_cube((13.2, 0.2, 0.18), (0, 0, 0), name="beam")
-    iron = mesh_cube((0.28, 0.26, 0.22), (-5.8, 0, 0), name="BandL")
-    iron2 = mesh_cube((0.28, 0.26, 0.22), (5.8, 0, 0), name="BandR")
-    obj = join([beam, iron, iron2], "beam")
-    finish_mesh(obj, sub=0)
-    export_glb(obj, "kit/beam.glb")
-
-
-def make_torch() -> None:
-    reset()
-    plate = mesh_cube((0.16, 0.05, 0.22), (0, 0.0, 0.05), name="Plate")
-    arm = mesh_cube((0.05, 0.05, 0.22), (0, 0.12, 0.12), (0.6, 0, 0), name="Arm")
-    shaft = mesh_cyl(0.03, 0.5, (0, 0.28, 0.18), verts=10, name="Shaft")
-    bowl = mesh_cyl(0.07, 0.07, (0, 0.54, 0.18), verts=12, name="Bowl")
-    wrap = mesh_cyl(0.045, 0.12, (0, 0.42, 0.18), verts=10, name="Wrap")
-    flame = mesh_cone(0.05, 0.01, 0.16, (0, 0.66, 0.18), name="Flame")
-    obj = join([plate, arm, shaft, bowl, wrap, flame], "torch")
-    finish_mesh(obj)
-    export_glb(obj, "props/torch.glb")
-
-
-def make_barrel() -> None:
-    reset()
-    body = mesh_cyl(0.32, 0.7, (0, 0, 0.36), verts=16, name="Body")
-    # bulge via scale on mid
-    top = mesh_cyl(0.30, 0.04, (0, 0, 0.72), verts=16, name="Lid")
-    bot = mesh_cyl(0.30, 0.04, (0, 0, 0.02), verts=16, name="Bot")
-    rings = [
-        mesh_cyl(0.335, 0.04, (0, 0, z), verts=16, name=f"Hoop{i}")
-        for i, z in enumerate((0.16, 0.36, 0.56))
-    ]
-    obj = join([body, top, bot] + rings, "barrel")
-    finish_mesh(obj)
-    export_glb(obj, "props/barrel.glb")
-
-
-def make_chest() -> None:
-    reset()
-    box = mesh_cube((0.95, 0.62, 0.5), (0, 0, 0.28), name="Box")
-    lid = mesh_cube((0.97, 0.64, 0.14), (0, 0, 0.58), name="Lid")
-    band1 = mesh_cube((0.99, 0.08, 0.54), (0, 0, 0.18), name="Band1")
-    band2 = mesh_cube((0.99, 0.08, 0.54), (0, 0, 0.42), name="Band2")
-    lock = mesh_cube((0.12, 0.08, 0.16), (0, 0.34, 0.36), name="Lock")
-    obj = join([box, lid, band1, band2, lock], "chest")
-    finish_mesh(obj)
-    export_glb(obj, "props/chest.glb")
-
-
-def make_chain() -> None:
-    reset()
-    links = []
-    for i in range(7):
-        rot = (math.pi * 0.5 * (i % 2), 0, 0.15)
-        links.append(mesh_torus(0.07, 0.018, (0, 0, 0.08 + i * 0.13), rot, name=f"L{i}"))
-    obj = join(links, "chain")
-    finish_mesh(obj, do_bevel=False)
-    export_glb(obj, "props/chain.glb")
-
-
-def make_bones() -> None:
-    reset()
-    skull = mesh_uvsphere(0.16, (0, 0, 0.2), name="Skull", segments=14, rings=9)
-    jaw = mesh_cube((0.18, 0.12, 0.07), (0, 0.04, 0.08), name="Jaw")
-    f1 = mesh_cyl(0.03, 0.48, (0.16, 0.05, 0.08), (0, 1.1, 0.4), verts=8, name="F1")
-    f2 = mesh_cyl(0.028, 0.42, (-0.14, -0.04, 0.1), (0.3, -0.8, 0.2), verts=8, name="F2")
-    rib = mesh_torus(0.12, 0.015, (0.02, -0.12, 0.14), (1.1, 0, 0), name="Rib")
-    obj = join([skull, jaw, f1, f2, rib], "bones")
-    finish_mesh(obj)
-    export_glb(obj, "props/bones.glb")
-
-
-def make_sword() -> None:
-    reset()
-    blade = mesh_cube((0.045, 0.012, 0.78), (0, 0, 0.55), name="Blade")
-    # taper by extra tip
-    tip = mesh_cone(0.03, 0.002, 0.12, (0, 0, 0.98), rot=(0, 0, 0), name="Tip")
-    fuller = mesh_cube((0.01, 0.014, 0.62), (0, 0, 0.52), name="Fuller")
-    guard = mesh_cube((0.22, 0.04, 0.04), (0, 0, 0.16), name="Guard")
-    grip = mesh_cyl(0.02, 0.14, (0, 0, 0.07), verts=10, name="Grip")
-    pommel = mesh_uvsphere(0.03, (0, 0, -0.02), name="Pommel", segments=10, rings=6)
-    obj = join([blade, tip, fuller, guard, grip, pommel], "sword")
-    finish_mesh(obj, sub=1)
-    export_glb(obj, "weapons/sword.glb")
-
-
-def make_shield() -> None:
-    reset()
-    body = mesh_cube((0.42, 0.08, 0.56), (0, 0, 0), name="Body")
-    # heater taper via extra plates
-    rim = mesh_cube((0.46, 0.04, 0.6), (0, 0, 0), name="Rim")
-    boss = mesh_uvsphere(0.07, (0, 0.05, 0.04), name="Boss", segments=12, rings=8)
-    strap = mesh_cube((0.08, 0.03, 0.22), (0, -0.05, 0), name="Strap")
-    obj = join([body, rim, boss, strap], "shield")
-    finish_mesh(obj, sub=1)
-    export_glb(obj, "weapons/shield.glb")
+def make_skull(loc, prefix: str = "Bone") -> list[bpy.types.Object]:
+    x, y, z = loc
+    skull = mesh_uvsphere(0.105, (x, y + 0.01, z), f"{prefix}_skull", 16, 12)
+    skull.scale = (0.95, 1.16, 1.08)
+    apply_scale(skull)
+    jaw = mesh_cube((0.13, 0.09, 0.05), (x, y + 0.03, z - 0.12), name=f"{prefix}_jaw")
+    teeth = []
+    for i, sx in enumerate((-0.035, -0.012, 0.012, 0.035)):
+        teeth.append(mesh_cube((0.012, 0.012, 0.018), (x + sx, y + 0.07, z - 0.145), name=f"{prefix}_tooth{i}"))
+    sockets = []
+    for i, sx in enumerate((-1.0, 1.0)):
+        sockets.append(mesh_uvsphere(0.028, (x + sx * 0.038, y + 0.08, z + 0.012), f"Cavity_eye{i}", 8, 6))
+    sockets.append(mesh_cube((0.024, 0.04, 0.03), (x, y + 0.09, z - 0.03), name="Cavity_nose"))
+    return [skull, jaw, *teeth, *sockets]
 
 
 def creature_actions() -> dict:
@@ -354,113 +286,328 @@ def bones_humanoid() -> list:
     ]
 
 
-def make_skeleton() -> None:
+def make_pillar() -> None:
+    reset()
+    base = mesh_cube((0.58, 0.58, 0.2), (0, 0, 0.1), name="Base")
+    shaft = mesh_cyl(0.16, 3.55, (0, 0, 2.0), verts=12, name="Shaft")
+    flute = mesh_cyl(0.175, 3.2, (0, 0, 2.0), verts=12, name="Flute")
+    cap = mesh_cube((0.52, 0.52, 0.16), (0, 0, 3.92), name="Cap")
+    neck = mesh_cyl(0.2, 0.18, (0, 0, 3.72), verts=12, name="Neck")
+    obj = join([base, shaft, flute, cap, neck], "pillar")
+    finish_mesh(obj, width=0.016)
+    export_glb(obj, "kit/pillar.glb")
+
+
+def make_arch() -> None:
     reset()
     parts = []
-    skull = mesh_uvsphere(0.13, (0, 0.02, 1.55), name="Skull", segments=14, rings=10)
-    jaw = mesh_cube((0.14, 0.1, 0.06), (0, 0.04, 1.42), name="Jaw")
-    parts += [skull, jaw]
-    for i in range(6):
-        z = 0.7 + i * 0.12
-        parts.append(mesh_cube((0.08, 0.06, 0.06), (0, 0, z), name=f"Vert{i}"))
-        parts.append(mesh_torus(0.12, 0.012, (0, 0, z), (1.2, 0, 0), name=f"Rib{i}"))
-    pelvis = mesh_cube((0.22, 0.12, 0.1), (0, 0, 0.62), name="Pelvis")
-    parts.append(pelvis)
-    for side, sx in (("L", 0.16), ("R", -0.16)):
-        parts.append(mesh_cyl(0.035, 0.38, (sx, 0, 1.15), (0, 0.15 * (1 if sx > 0 else -1), 0.9), verts=8, name=f"{side}Uarm"))
-        parts.append(mesh_cyl(0.03, 0.34, (sx * 1.15, 0.02, 0.82), (0, 0, 0.2), verts=8, name=f"{side}Larm"))
-        parts.append(mesh_cyl(0.04, 0.4, (sx * 0.7, 0, 0.38), (0.15, 0, 0), verts=8, name=f"{side}Thigh"))
-        parts.append(mesh_cyl(0.035, 0.36, (sx * 0.7, 0.02, 0.12), (0.05, 0, 0), verts=8, name=f"{side}Shin"))
-    obj = join(parts, "skeleton")
+    for i in range(-5, 6):
+        t = i / 5.0
+        ang = math.pi * 0.5 * t
+        x = math.sin(ang) * 1.48
+        z = 2.58 + math.cos(ang) * 0.58
+        block = mesh_cube((0.36, 0.44, 0.26), (x, 0, z), (0, 0, -ang * 0.35), name=f"V{i}")
+        parts.append(block)
+    left = mesh_cube((0.24, 0.44, 2.45), (-1.52, 0, 1.22), name="L")
+    right = mesh_cube((0.24, 0.44, 2.45), (1.52, 0, 1.22), name="R")
+    obj = join(parts + [left, right], "arch")
+    finish_mesh(obj, width=0.014)
+    export_glb(obj, "kit/arch.glb")
+
+
+def make_beam() -> None:
+    reset()
+    beam = mesh_cube((13.2, 0.2, 0.18), (0, 0, 0), name="beam")
+    iron = mesh_cube((0.28, 0.26, 0.22), (-5.8, 0, 0), name="BandL")
+    iron2 = mesh_cube((0.28, 0.26, 0.22), (5.8, 0, 0), name="BandR")
+    obj = join([beam, iron, iron2], "beam")
     finish_mesh(obj)
-    add_simple_armature(obj, bones_humanoid(), creature_actions())
-    export_glb(obj, "monsters/skeleton.glb")
+    export_glb(obj, "kit/beam.glb")
+
+
+def make_torch() -> None:
+    reset()
+    plate = mesh_cube((0.16, 0.05, 0.22), (0, 0.0, 0.05), name="Plate")
+    arm = mesh_cube((0.05, 0.05, 0.22), (0, 0.12, 0.12), (0.6, 0, 0), name="Arm")
+    shaft = mesh_cyl(0.03, 0.5, (0, 0.28, 0.18), verts=10, name="Shaft")
+    bowl = mesh_cyl(0.07, 0.07, (0, 0.54, 0.18), verts=12, name="Bowl")
+    wrap = mesh_cyl(0.045, 0.12, (0, 0.42, 0.18), verts=10, name="Wrap")
+    flame = mesh_cone(0.05, 0.01, 0.16, (0, 0.66, 0.18), name="Flame")
+    obj = join([plate, arm, shaft, bowl, wrap, flame], "torch")
+    finish_mesh(obj)
+    export_glb(obj, "props/torch.glb")
+
+
+def make_barrel() -> None:
+    reset()
+    body = mesh_cyl(0.32, 0.7, (0, 0, 0.36), verts=16, name="Body")
+    top = mesh_cyl(0.30, 0.04, (0, 0, 0.72), verts=16, name="Lid")
+    bot = mesh_cyl(0.30, 0.04, (0, 0, 0.02), verts=16, name="Bot")
+    rings = [mesh_cyl(0.335, 0.04, (0, 0, z), verts=16, name=f"Hoop{i}") for i, z in enumerate((0.16, 0.36, 0.56))]
+    obj = join([body, top, bot] + rings, "barrel")
+    finish_mesh(obj)
+    export_glb(obj, "props/barrel.glb")
+
+
+def make_chest() -> None:
+    reset()
+    box = mesh_cube((0.95, 0.62, 0.5), (0, 0, 0.28), name="Box")
+    lid = mesh_cube((0.97, 0.64, 0.14), (0, 0, 0.58), name="Lid")
+    band1 = mesh_cube((0.99, 0.08, 0.54), (0, 0, 0.18), name="Band1")
+    band2 = mesh_cube((0.99, 0.08, 0.54), (0, 0, 0.42), name="Band2")
+    lock = mesh_cube((0.12, 0.08, 0.16), (0, 0.34, 0.36), name="Lock")
+    obj = join([box, lid, band1, band2, lock], "chest")
+    finish_mesh(obj)
+    export_glb(obj, "props/chest.glb")
+
+
+def make_chain() -> None:
+    reset()
+    links = []
+    for i in range(7):
+        rot = (math.pi * 0.5 * (i % 2), 0, 0.15)
+        links.append(mesh_torus(0.07, 0.018, (0, 0, 0.08 + i * 0.13), rot, name=f"L{i}"))
+    obj = join(links, "chain")
+    finish_mesh(obj, do_bevel=False)
+    export_glb(obj, "props/chain.glb")
+
+
+def make_bones() -> None:
+    reset()
+    parts = make_skull((0, 0, 0.22), "Bone")
+    f1 = mesh_cyl(0.03, 0.48, (0.16, 0.05, 0.08), (0, 1.1, 0.4), verts=8, name="Bone_f1")
+    f2 = mesh_cyl(0.028, 0.42, (-0.14, -0.04, 0.1), (0.3, -0.8, 0.2), verts=8, name="Bone_f2")
+    obj = join(parts + [f1, f2], "bones")
+    finish_mesh(obj)
+    export_glb(obj, "props/bones.glb")
+
+
+def make_sword() -> None:
+    reset()
+    blade = mesh_cube((0.055, 0.008, 0.78), (0, 0, 0.58), name="Blade")
+    tip = mesh_cone(0.028, 0.001, 0.11, (0, 0, 1.02), name="Tip")
+    fuller = mesh_cube((0.012, 0.01, 0.62), (0, 0, 0.55), name="Fuller")
+    guard = mesh_cube((0.24, 0.035, 0.035), (0, 0, 0.17), name="Guard")
+    grip = mesh_cyl(0.018, 0.13, (0, 0, 0.08), verts=10, name="Grip")
+    pommel = mesh_uvsphere(0.028, (0, 0, -0.01), name="Pommel", segments=10, rings=6)
+    obj = join([blade, tip, fuller, guard, grip, pommel], "sword")
+    finish_mesh(obj, width=0.006)
+    export_glb(obj, "weapons/sword.glb")
+
+
+def make_shield() -> None:
+    reset()
+    body = mesh_cube((0.42, 0.08, 0.56), (0, 0, 0), name="Body")
+    rim = mesh_cube((0.46, 0.04, 0.6), (0, 0, 0), name="Rim")
+    boss = mesh_uvsphere(0.07, (0, 0.05, 0.04), name="Boss", segments=12, rings=8)
+    strap = mesh_cube((0.08, 0.03, 0.22), (0, -0.05, 0), name="Strap")
+    obj = join([body, rim, boss, strap], "shield")
+    finish_mesh(obj)
+    export_glb(obj, "weapons/shield.glb")
+
+
+def make_skeleton() -> None:
+    reset()
+    bone_parts: list[bpy.types.Object] = []
+    extras: list[bpy.types.Object] = []
+    bone_parts += make_skull((0, 0.02, 1.58))
+    for i in range(9):
+        z = 0.98 + i * 0.055
+        bone_parts.append(mesh_cube((0.055, 0.045, 0.04), (0, 0.01, z), name=f"Bone_vert{i}"))
+    for i in range(7):
+        z = 1.08 + i * 0.055
+        radius = 0.16 - i * 0.008
+        bone_parts.append(curve_rib(z, 1.0, f"Bone_ribL{i}", radius, 0.09))
+        bone_parts.append(curve_rib(z, -1.0, f"Bone_ribR{i}", radius, 0.09))
+    sternum = mesh_cube((0.04, 0.03, 0.28), (0, 0.09, 1.22), name="Bone_sternum")
+    bone_parts.append(sternum)
+    pelvis_l = mesh_cube((0.13, 0.08, 0.1), (0.1, 0.01, 0.9), (0.15, 0, 0.25), name="Bone_pelvisL")
+    pelvis_r = mesh_cube((0.13, 0.08, 0.1), (-0.1, 0.01, 0.9), (-0.15, 0, -0.25), name="Bone_pelvisR")
+    sacrum = mesh_cube((0.08, 0.06, 0.1), (0, 0.0, 0.92), name="Bone_sacrum")
+    bone_parts += [pelvis_l, pelvis_r, sacrum]
+    bone_parts += long_bone(0.032, 0.30, (0.22, 0.02, 1.38), (0.15, 0.0, 0.9), "Bone_humerusL")
+    bone_parts += long_bone(0.026, 0.28, (0.28, 0.03, 1.08), (0.05, 0.0, 0.15), "Bone_ulnaL")
+    bone_parts += long_bone(0.032, 0.30, (-0.22, 0.02, 1.38), (0.15, 0.0, -0.9), "Bone_humerusR")
+    bone_parts += long_bone(0.026, 0.28, (-0.30, 0.04, 1.10), (0.1, 0.15, -0.2), "Bone_ulnaR")
+    bone_parts += long_bone(0.038, 0.38, (0.11, 0.01, 0.68), (0.08, 0, 0), "Bone_femurL")
+    bone_parts += long_bone(0.032, 0.36, (0.12, 0.02, 0.30), (0.04, 0, 0), "Bone_tibiaL")
+    bone_parts += long_bone(0.038, 0.38, (-0.11, 0.01, 0.68), (0.08, 0, 0), "Bone_femurR")
+    bone_parts += long_bone(0.032, 0.36, (-0.12, 0.02, 0.30), (0.04, 0, 0), "Bone_tibiaR")
+    bone_parts.append(mesh_cube((0.12, 0.06, 0.04), (0.13, 0.05, 0.06), name="Bone_footL"))
+    bone_parts.append(mesh_cube((0.12, 0.06, 0.04), (-0.13, 0.05, 0.06), name="Bone_footR"))
+    for i, sx in enumerate((-0.03, 0.0, 0.03, 0.055)):
+        bone_parts.append(mesh_cyl(0.008, 0.07, (0.34 + sx * 0.4, 0.04, 0.94), (0.2, 0, 0.4), verts=6, name=f"Bone_fingerL{i}"))
+        bone_parts.append(mesh_cyl(0.008, 0.07, (-0.42 + sx * 0.3, 0.08, 0.96), (0.3, 0.2, -0.3), verts=6, name=f"Bone_fingerR{i}"))
+    extras.append(mesh_cube((0.18, 0.1, 0.08), (0.24, 0.04, 1.46), (0.2, 0, 0.3), name="Armor_pauldron"))
+    extras.append(mesh_cube((0.22, 0.06, 0.05), (0, 0.04, 0.94), name="Armor_belt"))
+    extras.append(mesh_cube((0.1, 0.05, 0.16), (0.13, 0.03, 0.22), name="Armor_greaveL"))
+    blade = mesh_cube((0.04, 0.008, 0.62), (-0.48, 0.12, 0.85), (0.2, 0.35, -0.15), name="Sword_blade")
+    guard = mesh_cube((0.14, 0.03, 0.03), (-0.42, 0.08, 0.58), (0.2, 0.35, -0.15), name="Sword_guard")
+    extras += [blade, guard]
+    body = join(bone_parts, "Bone_body")
+    finish_mesh(body, width=0.006)
+    for extra in extras:
+        finish_mesh(extra, width=0.008)
+    arm = add_simple_armature([body] + extras, bones_humanoid(), creature_actions())
+    arm.name = "skeleton"
+    export_glb(arm, "monsters/skeleton.glb")
 
 
 def make_wolf() -> None:
     reset()
-    body = mesh_uvsphere(0.28, (0, 0, 0.42), name="Body", segments=16, rings=10)
-    body.scale = (1.55, 0.7, 0.72)
-    bpy.ops.object.transform_apply(scale=True)
-    chest = mesh_uvsphere(0.22, (0.28, 0, 0.46), name="Chest", segments=12, rings=8)
-    head = mesh_uvsphere(0.16, (0.55, 0, 0.52), name="Head", segments=12, rings=8)
-    snout = mesh_cone(0.09, 0.03, 0.18, (0.72, 0, 0.46), rot=(0, math.pi * 0.5, 0), name="Snout")
-    ear_l = mesh_cone(0.05, 0.0, 0.12, (0.52, 0.08, 0.66), rot=(0.4, 0, 0), name="EarL")
-    ear_r = mesh_cone(0.05, 0.0, 0.12, (0.52, -0.08, 0.66), rot=(-0.4, 0, 0), name="EarR")
-    tail = mesh_cone(0.06, 0.015, 0.42, (-0.42, 0, 0.48), rot=(0, -1.1, 0), name="Tail")
-    legs = []
-    for i, (x, y) in enumerate(((0.32, 0.12), (0.32, -0.12), (-0.22, 0.12), (-0.22, -0.12))):
-        legs.append(mesh_cyl(0.045, 0.38, (x, y, 0.2), verts=8, name=f"Leg{i}"))
-    obj = join([body, chest, head, snout, ear_l, ear_r, tail] + legs, "cave_wolf")
-    finish_mesh(obj, sub=1)
+    fur: list[bpy.types.Object] = []
+    extras: list[bpy.types.Object] = []
+    chest = mesh_uvsphere(0.22, (0.22, 0, 0.48), "Fur_chest", 14, 10)
+    chest.scale = (1.15, 0.85, 0.95)
+    apply_scale(chest)
+    belly = mesh_uvsphere(0.18, (-0.08, 0, 0.42), "Fur_belly", 12, 8)
+    belly.scale = (1.35, 0.75, 0.8)
+    apply_scale(belly)
+    neck = mesh_cyl(0.09, 0.18, (0.42, 0, 0.54), (0, 1.1, 0), verts=10, name="Fur_neck")
+    head = mesh_uvsphere(0.13, (0.58, 0.02, 0.58), "Fur_head", 12, 8)
+    head.scale = (1.15, 0.85, 0.9)
+    apply_scale(head)
+    snout = mesh_cone(0.07, 0.03, 0.16, (0.74, 0.02, 0.52), (0, math.pi * 0.5, 0), name="Fur_snout")
+    jaw = mesh_cube((0.12, 0.06, 0.04), (0.70, 0.02, 0.46), name="Fur_jaw")
+    ear_l = mesh_cone(0.04, 0.0, 0.11, (0.54, 0.07, 0.70), (0.45, 0, 0), name="Fur_earL")
+    ear_r = mesh_cone(0.04, 0.0, 0.11, (0.54, -0.07, 0.70), (-0.45, 0, 0), name="Fur_earR")
+    tail = mesh_cone(0.05, 0.015, 0.42, (-0.38, 0, 0.50), (0, -1.15, 0), name="Fur_tail")
+    ruff = mesh_uvsphere(0.12, (0.36, 0, 0.56), "Fur_ruff", 10, 7)
+    fur += [chest, belly, neck, head, snout, jaw, ear_l, ear_r, tail, ruff]
+    for i, (x, y) in enumerate(((0.30, 0.11), (0.30, -0.11), (-0.16, 0.11), (-0.16, -0.11))):
+        fur += long_bone(0.04, 0.22, (x, y, 0.32), (0.15 if i < 2 else 0.05, 0, 0), f"Fur_uleg{i}")
+        fur += long_bone(0.032, 0.18, (x + (0.02 if i < 2 else -0.02), y, 0.14), (0.05, 0, 0), f"Fur_lleg{i}")
+        fur.append(mesh_cube((0.09, 0.05, 0.035), (x, y, 0.03), name=f"Fur_paw{i}"))
+    extras.append(mesh_uvsphere(0.018, (0.64, 0.05, 0.62), "Eye_L", 8, 6))
+    extras.append(mesh_uvsphere(0.018, (0.64, -0.05, 0.62), "Eye_R", 8, 6))
+    extras.append(mesh_cube((0.03, 0.02, 0.02), (0.80, 0.02, 0.50), name="Bone_fang"))
+    body = join(fur, "Fur_body")
+    finish_mesh(body, width=0.008)
+    for extra in extras:
+        finish_mesh(extra, do_bevel=False)
     bones = [
-        ("root", (0, 0, 0.15), (0, 0, 0.35)),
-        ("spine", (0, 0, 0.35), (0.3, 0, 0.5), "root"),
-        ("head", (0.3, 0, 0.5), (0.65, 0, 0.55), "spine"),
-        ("Larm", (0.3, 0.12, 0.35), (0.3, 0.12, 0.05), "spine"),
-        ("Rarm", (0.3, -0.12, 0.35), (0.3, -0.12, 0.05), "spine"),
-        ("Lleg", (-0.2, 0.12, 0.3), (-0.2, 0.12, 0.05), "root"),
-        ("Rleg", (-0.2, -0.12, 0.3), (-0.2, -0.12, 0.05), "root"),
+        ("root", (0, 0, 0.12), (0, 0, 0.32)),
+        ("spine", (0, 0, 0.32), (0.28, 0, 0.5), "root"),
+        ("head", (0.28, 0, 0.5), (0.7, 0, 0.58), "spine"),
+        ("Larm", (0.3, 0.11, 0.32), (0.3, 0.11, 0.04), "spine"),
+        ("Rarm", (0.3, -0.11, 0.32), (0.3, -0.11, 0.04), "spine"),
+        ("Lleg", (-0.16, 0.11, 0.28), (-0.16, 0.11, 0.04), "root"),
+        ("Rleg", (-0.16, -0.11, 0.28), (-0.16, -0.11, 0.04), "root"),
     ]
-    add_simple_armature(obj, bones, creature_actions())
-    export_glb(obj, "monsters/cave_wolf.glb")
+    arm = add_simple_armature([body] + extras, bones, creature_actions())
+    arm.name = "cave_wolf"
+    export_glb(arm, "monsters/cave_wolf.glb")
 
 
 def make_wraith() -> None:
     reset()
-    hood = mesh_uvsphere(0.18, (0, 0, 1.45), name="Hood", segments=14, rings=9)
-    face = mesh_uvsphere(0.1, (0, 0.06, 1.42), name="Face", segments=10, rings=7)
-    robe = mesh_cone(0.42, 0.08, 1.35, (0, 0, 0.7), name="Robe")
-    sleeve_l = mesh_cone(0.1, 0.04, 0.55, (0.28, 0.05, 1.05), rot=(0, 0, 1.0), name="SL")
-    sleeve_r = mesh_cone(0.1, 0.04, 0.55, (-0.28, 0.05, 1.05), rot=(0, 0, -1.0), name="SR")
-    obj = join([hood, face, robe, sleeve_l, sleeve_r], "wraith")
-    finish_mesh(obj, sub=1)
-    add_simple_armature(obj, bones_humanoid(), creature_actions())
-    export_glb(obj, "monsters/wraith.glb")
+    robe = mesh_cone(0.46, 0.1, 1.42, (0, 0, 0.72), name="Robe_body")
+    hood = mesh_uvsphere(0.2, (0, 0.02, 1.48), "Hood_cowl", 14, 9)
+    hood.scale = (1.05, 1.2, 0.85)
+    apply_scale(hood)
+    sleeve_l = mesh_cone(0.11, 0.04, 0.58, (0.32, 0.06, 1.08), (0, 0, 1.05), name="Robe_sleeveL")
+    sleeve_r = mesh_cone(0.11, 0.04, 0.58, (-0.32, 0.06, 1.08), (0, 0, -1.05), name="Robe_sleeveR")
+    tatters = []
+    for i, x in enumerate((-0.18, -0.05, 0.08, 0.2)):
+        tatters.append(mesh_cube((0.08, 0.03, 0.35), (x, 0.05, 0.18), (0.15 * (i - 1), 0, 0.1), name=f"Tatter_{i}"))
+    robe_obj = join([robe, hood, sleeve_l, sleeve_r] + tatters, "Robe_body")
+    extras = make_skull((0, 0.04, 1.46))
+    extras.append(mesh_uvsphere(0.02, (0.04, 0.12, 1.48), "Glow_eyeL", 8, 6))
+    extras.append(mesh_uvsphere(0.02, (-0.04, 0.12, 1.48), "Glow_eyeR", 8, 6))
+    extras += long_bone(0.018, 0.34, (0.42, 0.08, 0.88), (0.2, 0, 0.9), "Bone_armL")
+    extras += long_bone(0.018, 0.34, (-0.42, 0.08, 0.88), (0.2, 0, -0.9), "Bone_armR")
+    finish_mesh(robe_obj, width=0.012)
+    bone_join = [e for e in extras if e.name.startswith("Bone") or e.name.startswith("Cavity")]
+    glow = [e for e in extras if e.name.startswith("Glow")]
+    body_bones = join(bone_join, "Bone_body") if bone_join else extras[0]
+    finish_mesh(body_bones, width=0.005)
+    for g in glow:
+        finish_mesh(g, do_bevel=False)
+    arm = add_simple_armature([robe_obj, body_bones] + glow, bones_humanoid(), creature_actions())
+    arm.name = "wraith"
+    export_glb(arm, "monsters/wraith.glb")
 
 
 def make_lich() -> None:
     reset()
-    skull = mesh_uvsphere(0.14, (0, 0.02, 1.72), name="Skull", segments=14, rings=9)
-    crown = mesh_torus(0.12, 0.02, (0, 0, 1.86), name="Crown")
-    spike = mesh_cone(0.03, 0.0, 0.12, (0, 0, 1.98), name="Spike")
-    robe = mesh_cone(0.48, 0.12, 1.5, (0, 0, 0.78), name="Robe")
-    chest = mesh_uvsphere(0.2, (0, 0, 1.25), name="Chest", segments=12, rings=8)
-    staff = mesh_cyl(0.025, 1.7, (-0.42, 0.1, 0.9), (0.15, 0, 0.2), verts=8, name="Staff")
-    orb = mesh_uvsphere(0.08, (-0.5, 0.16, 1.72), name="Orb", segments=10, rings=7)
-    obj = join([skull, crown, spike, robe, chest, staff, orb], "lich")
-    finish_mesh(obj, sub=1)
-    add_simple_armature(obj, bones_humanoid(), creature_actions())
-    export_glb(obj, "monsters/lich.glb")
+    bone_parts: list[bpy.types.Object] = []
+    extras: list[bpy.types.Object] = []
+    bone_parts += make_skull((0, 0.02, 1.68))
+    for i in range(8):
+        bone_parts.append(mesh_cube((0.05, 0.04, 0.04), (0, 0.01, 1.05 + i * 0.06), name=f"Bone_vert{i}"))
+    for i in range(6):
+        z = 1.15 + i * 0.055
+        bone_parts.append(curve_rib(z, 1.0, f"Bone_ribL{i}", 0.15 - i * 0.008, 0.08))
+        bone_parts.append(curve_rib(z, -1.0, f"Bone_ribR{i}", 0.15 - i * 0.008, 0.08))
+    bone_parts += long_bone(0.03, 0.32, (0.22, 0.02, 1.42), (0.2, 0, 0.8), "Bone_armL")
+    bone_parts += long_bone(0.03, 0.32, (-0.22, 0.02, 1.42), (0.2, 0, -0.8), "Bone_armR")
+    pelvis = mesh_cube((0.2, 0.1, 0.08), (0, 0, 0.98), name="Bone_pelvis")
+    bone_parts.append(pelvis)
+    robe = mesh_cone(0.5, 0.14, 1.15, (0, 0, 0.62), name="Robe_skirt")
+    cowl = mesh_cube((0.28, 0.16, 0.06), (0, 0.08, 1.52), name="Robe_cowl")
+    extras += [robe, cowl]
+    extras.append(mesh_torus(0.11, 0.018, (0, 0, 1.80), name="Crown_ring"))
+    extras.append(mesh_cone(0.025, 0.0, 0.12, (0, 0, 1.92), name="Crown_spike"))
+    extras.append(mesh_cone(0.02, 0.0, 0.09, (0.08, 0, 1.88), name="Crown_spike2"))
+    extras.append(mesh_cone(0.02, 0.0, 0.09, (-0.08, 0, 1.88), name="Crown_spike3"))
+    extras.append(mesh_cyl(0.022, 1.65, (-0.42, 0.12, 0.92), (0.18, 0, 0.15), verts=8, name="Staff_shaft"))
+    extras.append(mesh_uvsphere(0.07, (-0.52, 0.18, 1.72), "Glow_orb", 10, 7))
+    extras.append(mesh_cube((0.16, 0.08, 0.05), (0, 0.04, 1.02), name="Armor_belt"))
+    body = join(bone_parts, "Bone_body")
+    finish_mesh(body, width=0.006)
+    for extra in extras:
+        finish_mesh(extra, width=0.008)
+    arm = add_simple_armature([body] + extras, bones_humanoid(), creature_actions())
+    arm.name = "lich"
+    export_glb(arm, "monsters/lich.glb")
 
 
 def make_troll() -> None:
     reset()
-    torso = mesh_uvsphere(0.42, (0, 0.05, 1.15), name="Torso", segments=14, rings=9)
-    torso.scale = (1.15, 0.85, 1.25)
-    bpy.ops.object.transform_apply(scale=True)
-    belly = mesh_uvsphere(0.38, (0.05, 0.08, 0.78), name="Belly", segments=12, rings=8)
-    head = mesh_uvsphere(0.22, (0.12, 0.12, 1.72), name="Head", segments=12, rings=8)
-    jaw = mesh_cube((0.2, 0.14, 0.08), (0.2, 0.16, 1.58), name="Jaw")
-    shoulder_l = mesh_uvsphere(0.18, (0.42, 0.05, 1.38), name="SL")
-    shoulder_r = mesh_uvsphere(0.18, (-0.42, 0.05, 1.38), name="SR")
-    arm_l = mesh_cyl(0.1, 0.7, (0.55, 0.08, 0.95), (0.2, 0, 0.4), verts=10, name="AL")
-    arm_r = mesh_cyl(0.1, 0.7, (-0.55, 0.08, 0.95), (0.2, 0, -0.4), verts=10, name="AR")
-    leg_l = mesh_cyl(0.12, 0.7, (0.18, 0.04, 0.38), verts=10, name="LL")
-    leg_r = mesh_cyl(0.12, 0.7, (-0.18, 0.04, 0.38), verts=10, name="LR")
-    obj = join([torso, belly, head, jaw, shoulder_l, shoulder_r, arm_l, arm_r, leg_l, leg_r], "cave_troll")
-    finish_mesh(obj, sub=1)
+    hide: list[bpy.types.Object] = []
+    extras: list[bpy.types.Object] = []
+    torso = mesh_uvsphere(0.38, (0.04, 0.06, 1.18), "Hide_torso", 14, 10)
+    torso.scale = (1.2, 0.9, 1.15)
+    apply_scale(torso)
+    belly = mesh_uvsphere(0.34, (0.08, 0.1, 0.82), "Hide_belly", 12, 8)
+    belly.scale = (1.15, 0.95, 1.05)
+    apply_scale(belly)
+    head = mesh_uvsphere(0.2, (0.16, 0.14, 1.68), "Hide_head", 12, 8)
+    head.scale = (1.1, 0.95, 1.05)
+    apply_scale(head)
+    brow = mesh_cube((0.2, 0.06, 0.05), (0.22, 0.2, 1.76), name="Hide_brow")
+    jaw = mesh_cube((0.18, 0.12, 0.07), (0.22, 0.16, 1.56), name="Hide_jaw")
+    hide += [torso, belly, head, brow, jaw]
+    hide += long_bone(0.1, 0.62, (0.52, 0.08, 1.0), (0.25, 0, 0.35), "Hide_armL")
+    hide += long_bone(0.1, 0.62, (-0.48, 0.06, 1.02), (0.2, 0, -0.45), "Hide_armR")
+    hide += long_bone(0.11, 0.58, (0.18, 0.05, 0.42), (0.08, 0, 0), "Hide_legL")
+    hide += long_bone(0.11, 0.58, (-0.16, 0.04, 0.42), (0.08, 0, 0), "Hide_legR")
+    hide.append(mesh_cube((0.18, 0.1, 0.06), (0.2, 0.1, 0.08), name="Hide_footL"))
+    hide.append(mesh_cube((0.18, 0.1, 0.06), (-0.16, 0.08, 0.08), name="Hide_footR"))
+    extras.append(mesh_cone(0.03, 0.0, 0.12, (0.28, 0.2, 1.58), (1.1, 0, 0), name="Bone_tuskL"))
+    extras.append(mesh_cone(0.03, 0.0, 0.12, (0.16, 0.2, 1.58), (1.1, 0, 0), name="Bone_tuskR"))
+    extras.append(mesh_uvsphere(0.16, (0.08, 0.02, 0.95), "Stone_back", 8, 6))
+    extras.append(mesh_uvsphere(0.12, (-0.1, -0.02, 1.22), "Stone_shoulder", 8, 6))
+    extras.append(mesh_cyl(0.06, 1.15, (0.72, 0.16, 0.7), (0.4, 0.2, 0.15), verts=8, name="Club_shaft"))
+    extras.append(mesh_uvsphere(0.16, (0.92, 0.28, 1.18), "Club_head", 10, 7))
+    extras.append(mesh_uvsphere(0.022, (0.24, 0.22, 1.72), "Eye_L", 8, 6))
+    extras.append(mesh_uvsphere(0.022, (0.12, 0.22, 1.72), "Eye_R", 8, 6))
+    body = join(hide, "Hide_body")
+    finish_mesh(body, width=0.012)
+    for extra in extras:
+        finish_mesh(extra, width=0.01)
     bones = [
         ("root", (0, 0, 0.1), (0, 0, 0.4)),
         ("spine", (0, 0, 0.4), (0, 0, 1.2), "root"),
-        ("head", (0, 0, 1.2), (0.1, 0.1, 1.75), "spine"),
-        ("Larm", (0.4, 0, 1.3), (0.55, 0, 0.7), "spine"),
-        ("Rarm", (-0.4, 0, 1.3), (-0.55, 0, 0.7), "spine"),
+        ("head", (0, 0, 1.2), (0.14, 0.12, 1.72), "spine"),
+        ("Larm", (0.4, 0, 1.28), (0.55, 0, 0.7), "spine"),
+        ("Rarm", (-0.4, 0, 1.28), (-0.5, 0, 0.7), "spine"),
         ("Lleg", (0.18, 0, 0.4), (0.18, 0, 0.05), "root"),
-        ("Rleg", (-0.18, 0, 0.4), (-0.18, 0, 0.05), "root"),
+        ("Rleg", (-0.16, 0, 0.4), (-0.16, 0, 0.05), "root"),
     ]
-    add_simple_armature(obj, bones, creature_actions())
-    export_glb(obj, "monsters/cave_troll.glb")
+    arm = add_simple_armature([body] + extras, bones, creature_actions())
+    arm.name = "cave_troll"
+    export_glb(arm, "monsters/cave_troll.glb")
 
 
 def main() -> int:

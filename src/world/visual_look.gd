@@ -35,32 +35,34 @@ static func make_environment(def: DungeonTypeDef) -> Environment:
 	var q := quality()
 	var crypt := def != null and String(def.id) != "cavern"
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = def.fog_color.darkened(0.15) if def else Color(0.03, 0.02, 0.03)
+	env.background_color = Color(0.025, 0.03, 0.04) if crypt else Color(0.03, 0.03, 0.028)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	if def:
-		env.ambient_light_color = def.light_color.lerp(Color(0.55, 0.42, 0.3), 0.45)
+	if crypt:
+		env.ambient_light_color = Color(0.42, 0.52, 0.64)
+	elif def:
+		env.ambient_light_color = Color(0.40, 0.50, 0.48)
 	else:
-		env.ambient_light_color = Color(0.45, 0.32, 0.2)
+		env.ambient_light_color = Color(0.44, 0.50, 0.58)
 	if not using_forward_plus() or q == "low":
-		env.ambient_light_energy = 0.55
+		env.ambient_light_energy = 0.78
 	else:
-		env.ambient_light_energy = 0.22
+		env.ambient_light_energy = 0.28
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.08
-	env.tonemap_white = 6.0
+	env.tonemap_exposure = 1.02
+	env.tonemap_white = 6.5
 	env.fog_enabled = true
-	env.fog_light_color = def.fog_color.lightened(0.12) if def else Color(0.12, 0.08, 0.06)
-	env.fog_density = 0.01 if crypt else 0.008
-	env.fog_aerial_perspective = 0.35
+	env.fog_light_color = Color(0.14, 0.16, 0.20) if crypt else Color(0.14, 0.16, 0.14)
+	env.fog_density = 0.008 if crypt else 0.007
+	env.fog_aerial_perspective = 0.28
 	env.adjustment_enabled = true
 	if crypt:
-		env.adjustment_brightness = 1.02
-		env.adjustment_contrast = 1.12
-		env.adjustment_saturation = 0.92
+		env.adjustment_brightness = 1.10
+		env.adjustment_contrast = 1.06
+		env.adjustment_saturation = 0.90
 	else:
-		env.adjustment_brightness = 1.06
-		env.adjustment_contrast = 1.08
-		env.adjustment_saturation = 1.05
+		env.adjustment_brightness = 1.12
+		env.adjustment_contrast = 1.05
+		env.adjustment_saturation = 0.96
 	env.adjustment_color_correction = _grade(crypt)
 	if not is_headless() and using_forward_plus():
 		_enable_rich(env, q)
@@ -70,14 +72,14 @@ static func make_environment(def: DungeonTypeDef) -> Environment:
 static func make_title_environment() -> Environment:
 	var dummy := DungeonTypeDef.new()
 	dummy.id = &"crypt"
-	dummy.fog_color = Color(0.035, 0.025, 0.03)
-	dummy.light_color = Color(1.0, 0.62, 0.32)
+	dummy.fog_color = Color(0.04, 0.045, 0.055)
+	dummy.light_color = Color(0.55, 0.65, 0.8)
 	var env := make_environment(dummy)
-	env.fog_density = 0.016
-	env.ambient_light_energy = 0.32 if not using_forward_plus() else 0.14
+	env.fog_density = 0.01
+	env.ambient_light_energy = 0.62 if not using_forward_plus() else 0.22
 	env.glow_enabled = not is_headless()
-	env.glow_intensity = 0.45
-	env.glow_bloom = 0.08
+	env.glow_intensity = 0.32
+	env.glow_bloom = 0.05
 	return env
 
 
@@ -88,9 +90,9 @@ static func attach_world(parent: Node3D, def: DungeonTypeDef) -> WorldEnvironmen
 	parent.add_child(world)
 	var bounce := DirectionalLight3D.new()
 	bounce.name = "Fill"
-	bounce.rotation_degrees = Vector3(-48, 28, 0)
-	bounce.light_color = def.light_color.lerp(Color(1, 0.75, 0.5), 0.4) if def else Color(1, 0.75, 0.5)
-	bounce.light_energy = 0.45 if quality() == "low" or not using_forward_plus() else 0.16
+	bounce.rotation_degrees = Vector3(-55, 18, 0)
+	bounce.light_color = Color(0.55, 0.66, 0.82) if def == null or String(def.id) != "cavern" else Color(0.52, 0.62, 0.58)
+	bounce.light_energy = 0.55 if quality() == "low" or not using_forward_plus() else 0.14
 	bounce.shadow_enabled = false
 	parent.add_child(bounce)
 	return world
@@ -100,14 +102,14 @@ static func configure_omni(light: OmniLight3D, cast_shadow: bool) -> void:
 	var q := quality()
 	light.light_bake_mode = Light3D.BAKE_DISABLED
 	light.distance_fade_enabled = true
-	light.distance_fade_begin = 18.0
-	light.distance_fade_length = 8.0
+	light.distance_fade_begin = 16.0
+	light.distance_fade_length = 7.0
 	if is_headless() or q == "low" or not cast_shadow or not using_forward_plus():
 		light.shadow_enabled = false
 		return
 	light.shadow_enabled = true
 	light.shadow_bias = 0.08
-	light.shadow_opacity = 0.78
+	light.shadow_opacity = 0.72
 	if q == "ultra":
 		light.omni_shadow_mode = OmniLight3D.SHADOW_CUBE
 
@@ -116,44 +118,44 @@ static func _enable_rich(env: Environment, q: String) -> void:
 	if q == "low":
 		return
 	env.ssao_enabled = true
-	env.ssao_radius = 1.15
-	env.ssao_intensity = 1.8
+	env.ssao_radius = 1.05
+	env.ssao_intensity = 1.55
 	env.glow_enabled = q != "medium"
-	env.glow_intensity = 0.35
-	env.glow_bloom = 0.04
-	env.glow_hdr_threshold = 1.15
+	env.glow_intensity = 0.28
+	env.glow_bloom = 0.03
+	env.glow_hdr_threshold = 1.2
 	if q == "medium":
 		return
 	env.ssil_enabled = true
-	env.ssil_intensity = 0.7
+	env.ssil_intensity = 0.55
 	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.012
+	env.volumetric_fog_density = 0.01
 	env.volumetric_fog_albedo = env.fog_light_color
-	env.volumetric_fog_emission = env.fog_light_color.darkened(0.7)
-	env.volumetric_fog_emission_energy = 0.08
-	env.volumetric_fog_anisotropy = 0.25
+	env.volumetric_fog_emission = Color(0.08, 0.09, 0.11)
+	env.volumetric_fog_emission_energy = 0.05
+	env.volumetric_fog_anisotropy = 0.22
 	if q == "ultra":
 		env.sdfgi_enabled = true
 		env.sdfgi_use_occlusion = true
-		env.sdfgi_bounce_feedback = 0.35
-		env.sdfgi_energy = 0.55
+		env.sdfgi_bounce_feedback = 0.28
+		env.sdfgi_energy = 0.42
 
 
 static func _grade(crypt: bool) -> GradientTexture1D:
 	var grad := Gradient.new()
 	if crypt:
 		grad.colors = PackedColorArray([
-			Color(0.04, 0.03, 0.07),
-			Color(0.22, 0.14, 0.18),
-			Color(0.72, 0.58, 0.48),
-			Color(1.0, 0.92, 0.78),
+			Color(0.04, 0.05, 0.08),
+			Color(0.16, 0.16, 0.20),
+			Color(0.62, 0.58, 0.54),
+			Color(0.96, 0.93, 0.86),
 		])
 	else:
 		grad.colors = PackedColorArray([
-			Color(0.05, 0.03, 0.02),
-			Color(0.28, 0.16, 0.08),
-			Color(0.85, 0.58, 0.32),
-			Color(1.0, 0.94, 0.8),
+			Color(0.04, 0.05, 0.04),
+			Color(0.16, 0.17, 0.14),
+			Color(0.62, 0.56, 0.46),
+			Color(0.96, 0.92, 0.82),
 		])
 	grad.offsets = PackedFloat32Array([0.0, 0.28, 0.72, 1.0])
 	var tex := GradientTexture1D.new()
