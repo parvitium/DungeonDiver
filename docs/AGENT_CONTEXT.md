@@ -33,7 +33,7 @@ Autoload order: `ContentDB` → `GameSession` → `SaveService`.
 2. **Input is a command.** `Player.gather_command()` reads Godot input and **submits** it with `GameSession.submit_command`. `GameSession.tick` runs on `_physics_process` at `process_physics_priority` 20 (after pawns) and applies the inbox via `Player.apply_command` the same frame. Do not call `apply_command` from `_physics_process`, and do not sprinkle `Input.is_action_*` inside combat math. Set `GameSession.accept_local_input = false` when injecting host/remote commands.
 3. **Content is data.** New dungeon/monster/item = Resource + catalog or `data/*.tres`. Do not hard-code type lists in UI; iterate `ContentDB`.
 4. **Scaling is centralized.** `DD.effective_tier`, `DD.depth_scale`, `DD.rarity_weights_for_tier`, `LootGenerator`, `CombatResolver.scaled_monster_*`. If a number changes with depth, it belongs there so tests can lock it.
-5. **Visuals are disposable sockets.** Nodes are named `BodyVisual` / `WeaponVisual` / `ShieldVisual` or tagged `asset_socket`. Simulation must not depend on mesh shape beyond collision the builder already creates. PBR materials live in `PBRLibrary`; kit assembly in `DungeonKit`.
+5. **Visuals are disposable sockets.** Nodes are named `BodyVisual` / `WeaponVisual` / `ShieldVisual` or tagged `asset_socket`. Simulation must not depend on mesh shape beyond collision the builder already creates. PBR materials live in `PBRLibrary`; kit assembly in `DungeonKit`. Creature glbs are Mixamo-style armatures with `idle/walk/attack/hit/death`. Death clips must plant hips on the floor (~0.06–0.48 m, not inverted in the air). Rooms use continuous flagstones, stone-course walls, and groin vaults; wall height varies by room kind (start 3.85 / hall 4.65 / treasure 5.05 / boss 6.35).
 6. **No paid assets or services.** CC0 / self-made only. Credit every third-party source in `assets/CREDITS.md`.
 
 ## How a run works
@@ -51,7 +51,7 @@ Save file: `user://dungeondiver_save.json`, versioned by `DD.SAVE_VERSION`. Load
 
 `godot --headless --path . -s res://tests/run_tests.gd`
 
-Math and generation must stay green. If you change loot curves or dungeon connectivity, update tests in the same change.
+Math and generation must stay green. If you change loot curves, dungeon connectivity, death poses, or kit topology, update tests in the same change. Visuals suite asserts grounded death hips/head, wolf scale, and vault/architecture names.
 
 ## Multiplayer later
 

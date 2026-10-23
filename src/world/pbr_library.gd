@@ -35,8 +35,8 @@ static func floor_mat(theme: StringName) -> StandardMaterial3D:
 
 static func ceiling(theme: StringName) -> StandardMaterial3D:
 	if theme == &"cavern":
-		return _pbr("cavern_rock", Color(0.70, 0.68, 0.60), 0.96, 0.0, METERS_ROCK, 0.7)
-	return _pbr("crypt_brick", Color(0.88, 0.86, 0.80), 0.88, 0.0, METERS_BRICK, 0.7)
+		return _pbr("cavern_rock", Color(0.82, 0.78, 0.68), 0.90, 0.0, METERS_ROCK, 0.95)
+	return _pbr("crypt_brick", Color(0.96, 0.93, 0.86), 0.78, 0.0, METERS_BRICK, 1.05)
 
 
 static func wood() -> StandardMaterial3D:

@@ -49,26 +49,12 @@ static func vaulted_ceiling(size: Vector3, theme: StringName, wall_h: float) -> 
 	var root := Node3D.new()
 	root.name = "Vault"
 	root.set_meta("asset_socket", "ceiling")
-	var visual := MeshFactory.visual(MeshFactory.vault_ceiling(size, rise, 1.1, 10), PBRLibrary.ceiling(theme), "VaultMesh")
+	var visual := MeshFactory.visual(MeshFactory.vault_ceiling(size, rise, 1.1, 16), PBRLibrary.ceiling(theme), "VaultMesh")
 	root.add_child(visual)
-	for i in 4:
-		var t := (float(i) / 3.0 - 0.5)
-		var rib := MeshFactory.visual(
-			MeshFactory.beveled_box(Vector3(size.x - 0.7, 0.14, 0.18), 0.02, 0.7),
-			PBRLibrary.trim(theme),
-			"VaultRib"
-		)
-		rib.position = Vector3(0, rise * 0.42, t * (size.z - 1.4))
-		root.add_child(rib)
-	var cross := MeshFactory.visual(
-		MeshFactory.beveled_box(Vector3(0.18, 0.14, size.z - 0.7), 0.02, 0.7),
-		PBRLibrary.trim(theme),
-		"VaultRib"
-	)
-	cross.position = Vector3(0, rise * 0.42, 0)
-	root.add_child(cross)
+	var ribs := MeshFactory.visual(MeshFactory.groin_ribs(size, rise, 0.5), PBRLibrary.trim(theme), "VaultRib")
+	root.add_child(ribs)
 	var boss := MeshFactory.visual(MeshFactory.cylinder(0.16, 0.22, 10, 0.4), PBRLibrary.trim(theme), "VaultBoss")
-	boss.position = Vector3(0, rise * 0.55, 0)
+	boss.position = Vector3(0, rise * 0.92, 0)
 	root.add_child(boss)
 	return root
 

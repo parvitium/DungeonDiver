@@ -115,6 +115,26 @@ static func run() -> DDTest:
 	t.assert_gt(float(world.get_child_count()), 8.0, "kit spawned nodes")
 	t.assert_true(_has_socket(world), "asset sockets remain")
 	t.assert_true(_has_named(world, "Flagstone") or _has_named(world, "Vault") or _has_named(world, "Niche"), "dungeon architecture present")
+	var vault_mesh := MeshFactory.vault_ceiling(Vector3(8, 0.3, 8), 1.4, 1.1, 16)
+	var vault_verts: PackedVector3Array = vault_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var vault_peak := -999.0
+	var vault_edge := 999.0
+	for v in vault_verts:
+		vault_peak = maxf(vault_peak, v.y)
+		if absf(v.x) > 3.6 or absf(v.z) > 3.6:
+			vault_edge = minf(vault_edge, v.y)
+	t.assert_true(vault_peak > 1.05, "groin vault rises at the crown")
+	t.assert_true(vault_peak - vault_edge > 0.7, "vault is arched, not a flat lid")
+	t.assert_true(_has_named(world, "VaultRib"), "vault ribs present")
+	var start_h := RoomSpec.new()
+	start_h.kind = DD.RoomKind.START
+	var treasure_h := RoomSpec.new()
+	treasure_h.kind = DD.RoomKind.TREASURE
+	var boss_h := RoomSpec.new()
+	boss_h.kind = DD.RoomKind.BOSS
+	t.assert_true(absf(start_h.wall_height() - 3.85) < 0.01, "start room is lower")
+	t.assert_true(absf(treasure_h.wall_height() - 5.05) < 0.01, "treasure room is taller")
+	t.assert_true(absf(boss_h.wall_height() - 6.35) < 0.01, "boss room is vaulted high")
 	t.assert_true(_has_named(world, "Moss") or _has_named(world, "Damp") or _has_named(world, "Grime"), "corner moss/grime/damp")
 	t.assert_true(_has_named(world, "PillarBase") or _has_named(world, "PillarCap") or _has_named(world, "pillar"), "pillars with base/capital")
 	t.assert_true(_has_named(world, "WallStone") or _has_named(world, "WallPanel"), "irregular stone walls")
@@ -143,7 +163,8 @@ static func _assert_death_pose(t: DDTest, mob: Node, monster_id: String) -> void
 	anim.play(clip)
 	var animation := anim.get_animation(clip)
 	var length := animation.length if animation else 1.0
-	anim.seek(length, true)
+	# Land on the last authored key, not past the clip (that can snap back to rest).
+	anim.seek(maxf(0.0, length - 0.001), true)
 	anim.advance(0.0)
 	var skel := _find_skeleton(mob)
 	if skel:
@@ -151,12 +172,11 @@ static func _assert_death_pose(t: DDTest, mob: Node, monster_id: String) -> void
 	var vis := mob.get_node_or_null("BodyVisual") as Node3D
 	t.assert_true(vis != null, "%s death visual" % monster_id)
 	var hips_y := _bone_world_y(skel, vis, ["Hips", "hips", "Root", "root", "Spine", "spine", "Body"])
-	if hips_y >= 0.0:
-		t.assert_true(hips_y >= 0.06 and hips_y <= 0.48, "%s death hips grounded y=%s" % [monster_id, snapped(hips_y, 0.001)])
+	t.assert_true(hips_y >= 0.06 and hips_y <= 0.48, "%s death hips grounded y=%s" % [monster_id, snapped(hips_y, 0.001)])
 	var head_y := _bone_world_y(skel, vis, ["Head", "head"])
-	if head_y >= 0.0 and hips_y >= 0.0:
-		t.assert_true(absf(head_y - hips_y) < 0.9, "%s death head near hips (upright-oriented, not inverted)" % monster_id)
-		t.assert_true(head_y < 0.95, "%s death head not hanging in air y=%s" % [monster_id, snapped(head_y, 0.001)])
+	t.assert_true(head_y >= 0.0, "%s death head bone resolved y=%s" % [monster_id, snapped(head_y, 0.001)])
+	t.assert_true(absf(head_y - hips_y) < 0.9, "%s death head near hips (upright-oriented, not inverted) head=%s hips=%s" % [monster_id, snapped(head_y, 0.001), snapped(hips_y, 0.001)])
+	t.assert_true(head_y < 0.95, "%s death head not hanging in air y=%s" % [monster_id, snapped(head_y, 0.001)])
 	var aabb := _world_aabb(vis)
 	# Skinned get_aabb is bind-pose; still fail loudly if the whole visual is sky-high.
 	if aabb.size.y > 0.2:

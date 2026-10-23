@@ -94,3 +94,13 @@ func _room_key_light(parent: Node3D, origin: Vector3, room: RoomSpec, def: Dunge
 	key.omni_attenuation = 0.95
 	VisualLook.configure_omni(key, false)
 	parent.add_child(key)
+	var vault := OmniLight3D.new()
+	vault.name = "VaultFill"
+	vault.position = origin + Vector3(0, wall_h + DungeonKit.vault_rise(wall_h) * 0.45, 0)
+	vault.light_color = Color(1.0, 0.84, 0.58) if def == null or String(def.id) != "cavern" else Color(0.78, 0.82, 0.70)
+	vault.light_energy = 2.2 if room.kind == DD.RoomKind.BOSS else 1.55
+	vault.omni_range = 8.5
+	vault.omni_attenuation = 1.15
+	vault.shadow_enabled = false
+	VisualLook.configure_omni(vault, false)
+	parent.add_child(vault)

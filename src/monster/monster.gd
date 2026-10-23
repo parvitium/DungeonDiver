@@ -193,7 +193,15 @@ func _die() -> void:
 		tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.28)
 		tween.tween_callback(queue_free)
 		return
-	var timer := get_tree().create_timer(1.15)
+	var hold := 1.45
+	var clip := AssetLibrary.resolve_clip(_anim, "death")
+	if not clip.is_empty():
+		var animation := _anim.get_animation(clip)
+		if animation:
+			hold = maxf(animation.length + 0.35, 1.45)
+			_anim.seek(0.0, true)
+			_anim.play(clip)
+	var timer := get_tree().create_timer(hold)
 	timer.timeout.connect(queue_free)
 
 

@@ -296,12 +296,13 @@ static func vault_ceiling(size: Vector3, rise: float, tile: float, segs: int = 8
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var hx := size.x * 0.5
 	var hz := size.z * 0.5
-	for iz in segs:
-		for ix in segs:
-			var u0 := float(ix) / float(segs)
-			var v0 := float(iz) / float(segs)
-			var u1 := float(ix + 1) / float(segs)
-			var v1 := float(iz + 1) / float(segs)
+	var grid := maxi(8, segs)
+	for iz in grid:
+		for ix in grid:
+			var u0 := float(ix) / float(grid)
+			var v0 := float(iz) / float(grid)
+			var u1 := float(ix + 1) / float(grid)
+			var v1 := float(iz + 1) / float(grid)
 			var p00 := _vault_point(u0, v0, hx, hz, rise)
 			var p10 := _vault_point(u1, v0, hx, hz, rise)
 			var p11 := _vault_point(u1, v1, hx, hz, rise)
@@ -309,18 +310,73 @@ static func vault_ceiling(size: Vector3, rise: float, tile: float, segs: int = 8
 			var nrm := (p10 - p00).cross(p01 - p00).normalized()
 			if nrm.y > 0.0:
 				nrm = -nrm
-			var uw := size.x / maxf(0.05, tile) / float(segs)
-			var uh := size.z / maxf(0.05, tile) / float(segs)
-			_tri(st, p00, p10, p11, nrm, nrm, nrm, Vector2(u0 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v1 * uh * float(segs)))
-			_tri(st, p00, p11, p01, nrm, nrm, nrm, Vector2(u0 * uw * float(segs), v0 * uh * float(segs)), Vector2(u1 * uw * float(segs), v1 * uh * float(segs)), Vector2(u0 * uw * float(segs), v1 * uh * float(segs)))
+			var uw := size.x / maxf(0.05, tile) / float(grid)
+			var uh := size.z / maxf(0.05, tile) / float(grid)
+			_tri(st, p00, p10, p11, nrm, nrm, nrm, Vector2(u0 * uw * float(grid), v0 * uh * float(grid)), Vector2(u1 * uw * float(grid), v0 * uh * float(grid)), Vector2(u1 * uw * float(grid), v1 * uh * float(grid)))
+			_tri(st, p00, p11, p01, nrm, nrm, nrm, Vector2(u0 * uw * float(grid), v0 * uh * float(grid)), Vector2(u1 * uw * float(grid), v1 * uh * float(grid)), Vector2(u0 * uw * float(grid), v1 * uh * float(grid)))
 	st.generate_tangents()
 	var mesh := st.commit()
 	_cache[key] = mesh
 	return mesh
 
 
+static func groin_ribs(size: Vector3, rise: float, tile: float = 0.55) -> ArrayMesh:
+	var key := "gribs:%.2f:%.2f:%.2f:%.2f" % [size.x, size.z, rise, tile]
+	if _cache.has(key):
+		return _cache[key]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hx := size.x * 0.5
+	var hz := size.z * 0.5
+	_groin_rib_strip(st, hx, hz, rise, tile, false)
+	_groin_rib_strip(st, hx, hz, rise, tile, true)
+	st.generate_tangents()
+	var mesh := st.commit()
+	_cache[key] = mesh
+	return mesh
+
+
+static func _groin_rib_strip(st: SurfaceTool, hx: float, hz: float, rise: float, tile: float, flip: bool) -> void:
+	var segs := 16
+	var half := 0.055
+	var pts: Array[Vector3] = []
+	for i in segs + 1:
+		var t := float(i) / float(segs)
+		var u := t
+		var v := (1.0 - t) if flip else t
+		pts.append(_vault_point(u, v, hx, hz, rise) + Vector3(0, -0.03, 0))
+	for i in segs:
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[i + 1]
+		var along := b - a
+		if along.length_squared() < 1e-6:
+			continue
+		along = along.normalized()
+		var side := along.cross(Vector3.UP)
+		if side.length_squared() < 0.0001:
+			side = Vector3.RIGHT
+		side = side.normalized() * half
+		var up := along.cross(side).normalized() * half
+		var a0 := a - side - up
+		var a1 := a + side - up
+		var a2 := a + side + up
+		var a3 := a - side + up
+		var b0 := b - side - up
+		var b1 := b + side - up
+		var b2 := b + side + up
+		var b3 := b - side + up
+		var seg := (b - a).length()
+		_quad(st, a0, a1, b1, b0, -up.normalized(), seg, half * 2.0, tile)
+		_quad(st, a3, b3, b2, a2, up.normalized(), seg, half * 2.0, tile)
+		_quad(st, a1, a2, b2, b1, side.normalized(), seg, half * 2.0, tile)
+		_quad(st, a0, b0, b3, a3, -side.normalized(), seg, half * 2.0, tile)
+
+
 static func _vault_point(u: float, v: float, hx: float, hz: float, rise: float) -> Vector3:
-	var arch := sin(u * PI) * sin(v * PI)
+	# Groin vault: intersection of two barrel vaults. min() is the visible underside.
+	var barrel_x := sin(clampf(u, 0.0, 1.0) * PI)
+	var barrel_z := sin(clampf(v, 0.0, 1.0) * PI)
+	var arch := minf(barrel_x, barrel_z)
 	return Vector3((u - 0.5) * hx * 2.0, rise * arch, (v - 0.5) * hz * 2.0)
 
 
