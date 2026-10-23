@@ -1,8 +1,15 @@
 extends Control
 
 
+func _init() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_offsets_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	refresh()
 
@@ -15,12 +22,7 @@ func refresh() -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 
-	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", ThemeFactory.panel())
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.position = Vector2(-420, -280)
-	panel.size = Vector2(840, 560)
-	add_child(panel)
+	var panel := ThemeFactory.centered_sheet(self, Vector2(840, 560))
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)

@@ -10,7 +10,7 @@ func build(parent: Node3D, blueprint: DungeonBlueprint, def: DungeonTypeDef, bak
 		"player": Vector3.ZERO,
 		"nav": null,
 	}
-	_environment(parent, def)
+	VisualLook.attach_world(parent, def)
 
 	var nav := NavigationRegion3D.new()
 	nav.name = "Navigation"
@@ -21,74 +21,49 @@ func build(parent: Node3D, blueprint: DungeonBlueprint, def: DungeonTypeDef, bak
 	nav_mesh.agent_max_climb = 0.4
 	nav_mesh.cell_size = 0.25
 	nav_mesh.cell_height = 0.25
+	nav_mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	nav.navigation_mesh = nav_mesh
 	markers["nav"] = nav
 
+	var theme := DungeonKit.theme_of(def)
 	for room in blueprint.rooms:
-		_build_room(nav, parent, room, def, markers)
+		_build_room(nav, parent, room, def, theme, markers)
 
 	if bake_nav and DisplayServer.get_name() != "headless":
 		nav.bake_navigation_mesh(false)
 	return markers
 
 
-func _environment(parent: Node3D, def: DungeonTypeDef) -> void:
-	var world := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = def.fog_color
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = def.light_color.darkened(0.55)
-	env.ambient_light_energy = 0.35
-	env.fog_enabled = true
-	env.fog_light_color = def.fog_color
-	env.fog_density = 0.035
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	world.environment = env
-	parent.add_child(world)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, 35, 0)
-	sun.light_color = def.light_color
-	sun.light_energy = 0.35
-	sun.shadow_enabled = false
-	parent.add_child(sun)
-
-
-func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, def: DungeonTypeDef, markers: Dictionary) -> void:
+func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, _def: DungeonTypeDef, theme: StringName, markers: Dictionary) -> void:
 	var origin := room.world_origin()
 	var half := DD.ROOM_SIZE * 0.5
-	var floor_color := def.floor_color
-	if room.kind == DD.RoomKind.START:
-		floor_color = def.floor_color.lightened(0.08)
-	elif room.kind == DD.RoomKind.BOSS:
-		floor_color = def.floor_color.lerp(def.accent_color, 0.25)
+	var wall_h := room.wall_height()
 
-	var floor_body := Greybox.make_box(Vector3(DD.ROOM_SIZE, 0.35, DD.ROOM_SIZE), floor_color)
+	var floor_body := DungeonKit.flagstone_floor(Vector3(DD.ROOM_SIZE, 0.35, DD.ROOM_SIZE), theme, int(origin.x * 13.0 + origin.z * 29.0) + int(room.kind))
 	floor_body.position = origin + Vector3(0, -0.175, 0)
-	floor_body.set_meta("asset_socket", "floor")
 	nav.add_child(floor_body)
 
-	var ceiling := Greybox.make_box(Vector3(DD.ROOM_SIZE, 0.3, DD.ROOM_SIZE), def.wall_color.darkened(0.2))
-	ceiling.position = origin + Vector3(0, DD.WALL_HEIGHT + 0.15, 0)
-	ceiling.set_meta("asset_socket", "ceiling")
+	var ceiling := DungeonKit.vaulted_ceiling(Vector3(DD.ROOM_SIZE, 0.28, DD.ROOM_SIZE), theme, wall_h)
+	ceiling.position = origin + Vector3(0, wall_h - 0.10, 0)
 	parent.add_child(ceiling)
 
-	_wall_with_door(parent, origin + Vector3(0, DD.WALL_HEIGHT * 0.5, -half), Vector3(DD.ROOM_SIZE, DD.WALL_HEIGHT, DD.WALL_THICKNESS), bool(room.doors["n"]), def, "n")
-	_wall_with_door(parent, origin + Vector3(0, DD.WALL_HEIGHT * 0.5, half), Vector3(DD.ROOM_SIZE, DD.WALL_HEIGHT, DD.WALL_THICKNESS), bool(room.doors["s"]), def, "s")
-	_wall_with_door(parent, origin + Vector3(half, DD.WALL_HEIGHT * 0.5, 0), Vector3(DD.WALL_THICKNESS, DD.WALL_HEIGHT, DD.ROOM_SIZE), bool(room.doors["e"]), def, "e")
-	_wall_with_door(parent, origin + Vector3(-half, DD.WALL_HEIGHT * 0.5, 0), Vector3(DD.WALL_THICKNESS, DD.WALL_HEIGHT, DD.ROOM_SIZE), bool(room.doors["w"]), def, "w")
+	DungeonKit.wall_run(parent, origin + Vector3(0, wall_h * 0.5, -half), Vector3(DD.ROOM_SIZE, wall_h, DD.WALL_THICKNESS), bool(room.doors["n"]), theme, "n")
+	DungeonKit.wall_run(parent, origin + Vector3(0, wall_h * 0.5, half), Vector3(DD.ROOM_SIZE, wall_h, DD.WALL_THICKNESS), bool(room.doors["s"]), theme, "s")
+	DungeonKit.wall_run(parent, origin + Vector3(half, wall_h * 0.5, 0), Vector3(DD.WALL_THICKNESS, wall_h, DD.ROOM_SIZE), bool(room.doors["e"]), theme, "e")
+	DungeonKit.wall_run(parent, origin + Vector3(-half, wall_h * 0.5, 0), Vector3(DD.WALL_THICKNESS, wall_h, DD.ROOM_SIZE), bool(room.doors["w"]), theme, "w")
 
-	var lamp := OmniLight3D.new()
-	lamp.position = origin + Vector3(0, 2.8, 0)
-	lamp.light_color = def.light_color
-	lamp.light_energy = 1.6 if room.kind == DD.RoomKind.BOSS else 1.15
-	lamp.omni_range = 11.0
-	parent.add_child(lamp)
+	DungeonKit.rounded_corners(parent, origin, theme, wall_h)
+	DungeonKit.pillars(parent, origin, theme, wall_h)
+	DungeonKit.beams(parent, origin, theme, wall_h)
+	DungeonKit.wall_torches(parent, origin, room, theme, wall_h)
+	DungeonKit.decorate(parent, origin, room, theme)
+	DungeonKit.niches(parent, origin, room, theme, wall_h)
+	_room_key_light(parent, origin, room, _def, wall_h)
 
 	if room.kind == DD.RoomKind.START:
-		markers["player"] = origin + Vector3(0, 0.05, 0)
-		var plinth := Greybox.make_box(Vector3(1.4, 0.35, 1.4), def.accent_color)
+		markers["player"] = origin + room.spawn_offset()
+		markers["player_yaw"] = room.facing_yaw()
+		var plinth := DungeonKit.slab(Vector3(1.5, 0.4, 1.5), PBRLibrary.wood(), "plinth", 0.6)
 		plinth.position = origin + Vector3(-3.5, 0.2, -3.5)
 		parent.add_child(plinth)
 	else:
@@ -106,46 +81,26 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, def: D
 		markers["exit"] = origin + Vector3(0, 0.1, 3.6)
 
 
-func _wall_with_door(parent: Node3D, center: Vector3, size: Vector3, has_door: bool, def: DungeonTypeDef, dir: String) -> void:
-	if not has_door:
-		var wall := Greybox.make_box(size, def.wall_color)
-		wall.position = center
-		wall.set_meta("asset_socket", "wall")
-		parent.add_child(wall)
-		return
-
-	var axis_x := dir == "n" or dir == "s"
-	if axis_x:
-		var wing := (size.x - DD.DOOR_WIDTH) * 0.5
-		var left := Greybox.make_box(Vector3(wing, size.y, size.z), def.wall_color)
-		left.position = center + Vector3(-(DD.DOOR_WIDTH * 0.5 + wing * 0.5), 0, 0)
-		parent.add_child(left)
-		var right := Greybox.make_box(Vector3(wing, size.y, size.z), def.wall_color)
-		right.position = center + Vector3(DD.DOOR_WIDTH * 0.5 + wing * 0.5, 0, 0)
-		parent.add_child(right)
-		var lintel_h := size.y - DD.DOOR_HEIGHT
-		if lintel_h > 0.05:
-			var lintel := Greybox.make_box(Vector3(DD.DOOR_WIDTH, lintel_h, size.z), def.wall_color)
-			lintel.position = center + Vector3(0, (size.y - lintel_h) * 0.5, 0)
-			parent.add_child(lintel)
-	else:
-		var wing := (size.z - DD.DOOR_WIDTH) * 0.5
-		var left := Greybox.make_box(Vector3(size.x, size.y, wing), def.wall_color)
-		left.position = center + Vector3(0, 0, -(DD.DOOR_WIDTH * 0.5 + wing * 0.5))
-		parent.add_child(left)
-		var right := Greybox.make_box(Vector3(size.x, size.y, wing), def.wall_color)
-		right.position = center + Vector3(0, 0, DD.DOOR_WIDTH * 0.5 + wing * 0.5)
-		parent.add_child(right)
-		var lintel_h := size.y - DD.DOOR_HEIGHT
-		if lintel_h > 0.05:
-			var lintel := Greybox.make_box(Vector3(size.x, lintel_h, DD.DOOR_WIDTH), def.wall_color)
-			lintel.position = center + Vector3(0, (size.y - lintel_h) * 0.5, 0)
-			parent.add_child(lintel)
-
-	var frame := Greybox.make_box(
-		Vector3(DD.DOOR_WIDTH + 0.15, 0.12, DD.WALL_THICKNESS + 0.12) if axis_x else Vector3(DD.WALL_THICKNESS + 0.12, 0.12, DD.DOOR_WIDTH + 0.15),
-		def.accent_color,
-		false
-	)
-	frame.position = center + Vector3(0, -size.y * 0.5 + 0.08, 0)
-	parent.add_child(frame)
+func _room_key_light(parent: Node3D, origin: Vector3, room: RoomSpec, def: DungeonTypeDef, wall_h: float = DD.WALL_HEIGHT) -> void:
+	var key := OmniLight3D.new()
+	key.name = "RoomFill"
+	key.position = origin + Vector3(0, wall_h * 0.72, 0)
+	var cool := Color(0.52, 0.64, 0.80)
+	if def != null and String(def.id) == "cavern":
+		cool = Color(0.48, 0.60, 0.56)
+	key.light_color = cool
+	key.light_energy = 4.0 if room.kind == DD.RoomKind.BOSS else 3.1
+	key.omni_range = 12.0
+	key.omni_attenuation = 0.95
+	VisualLook.configure_omni(key, false)
+	parent.add_child(key)
+	var vault := OmniLight3D.new()
+	vault.name = "VaultFill"
+	vault.position = origin + Vector3(0, wall_h + DungeonKit.vault_rise(wall_h) * 0.45, 0)
+	vault.light_color = Color(1.0, 0.84, 0.58) if def == null or String(def.id) != "cavern" else Color(0.78, 0.82, 0.70)
+	vault.light_energy = 2.2 if room.kind == DD.RoomKind.BOSS else 1.55
+	vault.omni_range = 8.5
+	vault.omni_attenuation = 1.15
+	vault.shadow_enabled = false
+	VisualLook.configure_omni(vault, false)
+	parent.add_child(vault)

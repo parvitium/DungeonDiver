@@ -36,8 +36,8 @@ var input_enabled: bool = true
 var _camera: Camera3D
 var _melee_area: Area3D
 var _interact_ray: RayCast3D
-var _weapon_visual: MeshInstance3D
-var _shield_visual: MeshInstance3D
+var _weapon_visual: Node3D
+var _shield_visual: Node3D
 var _focus_prompt: String = ""
 
 
@@ -67,8 +67,19 @@ func _build_rig() -> void:
 	add_child(head)
 
 	_camera = Camera3D.new()
-	_camera.fov = 75.0
+	_camera.fov = _fov()
 	head.add_child(_camera)
+	var lamp := OmniLight3D.new()
+	lamp.name = "ViewLamp"
+	lamp.position = Vector3(0.15, -0.05, -0.25)
+	lamp.light_color = Color(0.78, 0.84, 0.92)
+	lamp.light_energy = 0.55
+	lamp.omni_range = 3.4
+	lamp.shadow_enabled = false
+	head.add_child(lamp)
+	var settings := get_node_or_null("/root/SettingsService")
+	if settings and settings.has_signal("changed") and not settings.changed.is_connected(_on_settings_changed):
+		settings.changed.connect(_on_settings_changed)
 
 	_interact_ray = RayCast3D.new()
 	_interact_ray.target_position = Vector3(0, 0, -2.6)
@@ -90,23 +101,14 @@ func _build_rig() -> void:
 	_melee_area.add_child(melee_shape)
 	head.add_child(_melee_area)
 
-	_weapon_visual = MeshInstance3D.new()
-	_weapon_visual.name = "WeaponVisual"
-	var sword := BoxMesh.new()
-	sword.size = Vector3(0.08, 0.08, 0.85)
-	_weapon_visual.mesh = sword
-	_weapon_visual.material_override = Greybox.make_material(Color(0.7, 0.7, 0.75))
-	_weapon_visual.position = Vector3(0.35, -0.28, -0.45)
-	_weapon_visual.rotation_degrees = Vector3(12, 8, 18)
+	_weapon_visual = _viewmodel(AssetLibrary.weapon_path("sword"), Vector3(0.05, 0.03, 0.52), PBRLibrary.metal(), "WeaponVisual", Vector3(68, 188, 6), 0.26)
+	_weapon_visual.position = Vector3(0.28, -0.22, -0.38)
+	_weapon_visual.rotation_degrees = Vector3(12, 10, 12)
 	head.add_child(_weapon_visual)
 
-	_shield_visual = MeshInstance3D.new()
-	_shield_visual.name = "ShieldVisual"
-	var shield := BoxMesh.new()
-	shield.size = Vector3(0.45, 0.6, 0.06)
-	_shield_visual.mesh = shield
-	_shield_visual.material_override = Greybox.make_material(Color(0.45, 0.32, 0.2))
-	_shield_visual.position = Vector3(-0.32, -0.22, -0.4)
+	_shield_visual = _viewmodel(AssetLibrary.weapon_path("shield"), Vector3(0.34, 0.46, 0.06), PBRLibrary.wood(), "ShieldVisual", Vector3(8, 180, 0), 0.55)
+	_shield_visual.position = Vector3(-0.3, -0.2, -0.4)
+	_shield_visual.rotation_degrees = Vector3(4, 10, -8)
 	_shield_visual.visible = false
 	head.add_child(_shield_visual)
 
@@ -154,10 +156,12 @@ func _physics_process(_delta: float) -> void:
 
 
 func _apply_look(look_delta: Vector2) -> void:
-	rotate_y(-look_delta.x * MOUSE_SENS)
-	look_pitch = clampf(look_pitch - look_delta.y * MOUSE_SENS, deg_to_rad(-85.0), deg_to_rad(85.0))
+	var sens := MOUSE_SENS * _mouse_scale()
+	rotate_y(-look_delta.x * sens)
+	look_pitch = clampf(look_pitch - look_delta.y * sens, deg_to_rad(-85.0), deg_to_rad(85.0))
 	if _camera:
 		_camera.get_parent().rotation.x = look_pitch
+		_camera.fov = _fov()
 
 
 func _apply_move(cmd: PlayerCommand, delta: float, stats: StatBlock) -> void:
@@ -310,3 +314,46 @@ func _on_profile_changed() -> void:
 	health = minf(health, stats.max_health)
 	stamina = minf(stamina, stats.max_stamina)
 	vitals_changed.emit()
+
+
+func _on_settings_changed() -> void:
+	if _camera:
+		_camera.fov = _fov()
+
+
+func _fov() -> float:
+	var settings := get_node_or_null("/root/SettingsService")
+	return settings.fov if settings else 75.0
+
+
+func _mouse_scale() -> float:
+	var settings := get_node_or_null("/root/SettingsService")
+	return settings.mouse_sensitivity if settings else 1.0
+
+
+func _viewmodel(path: String, fallback_size: Vector3, material: Material, name: String, mesh_rot: Vector3, mesh_scale: float) -> Node3D:
+	var root := Node3D.new()
+	root.name = name
+	var authored := AssetLibrary.instance(path)
+	if authored:
+		authored.name = "Mesh"
+		_paint_meshes(authored, material)
+		authored.rotation_degrees = mesh_rot
+		authored.scale = Vector3.ONE * mesh_scale
+		root.add_child(authored)
+		return root
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Mesh"
+	var box := BoxMesh.new()
+	box.size = fallback_size
+	mesh.mesh = box
+	mesh.material_override = material
+	root.add_child(mesh)
+	return root
+
+
+func _paint_meshes(node: Node, material: Material) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).material_override = material
+	for child in node.get_children():
+		_paint_meshes(child, material)

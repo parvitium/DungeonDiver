@@ -1,0 +1,13 @@
+{
+  "crypt_brick": "stone_brick_wall_001",
+  "crypt_floor": "cobblestone_floor_04",
+  "cavern_rock": "rock_wall_10",
+  "cavern_floor": "forest_ground_04",
+  "wood": "weathered_planks",
+  "metal": "rusty_metal_02",
+  "bone": "plaster_stone_wall_01",
+  "cloth": "hessian_230",
+  "hide": "brown_leather",
+  "skin": "original_troll_skin",
+  "fur": "original_wolf_fur"
+}

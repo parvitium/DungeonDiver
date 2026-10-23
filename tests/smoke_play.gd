@@ -28,6 +28,8 @@ func _ready() -> void:
 	GameSession.submit_command(move_cmd)
 	GameSession.tick(0.05)
 	failed += _check(player.global_position.distance_to(start) > 0.05, "session inbox moves pawn")
+	failed += _check(player.get_node_or_null("Head/WeaponVisual") != null, "WeaponVisual socket")
+	failed += _check(player.get_node_or_null("Head/ShieldVisual") != null, "ShieldVisual socket")
 
 	var mob := Monster.new()
 	var monster_def: MonsterDef = ContentDB.get_monster(&"skeleton")
@@ -41,6 +43,13 @@ func _ready() -> void:
 	melee_cmd.melee = true
 	player.apply_command(melee_cmd, 0.016)
 	failed += _check(mob.health < hp_before, "melee shapecast hits")
+	failed += _check(mob.get_node_or_null("BodyVisual") != null, "BodyVisual socket")
+
+	var title: Node = load("res://scenes/title.tscn").instantiate()
+	add_child(title)
+	failed += _check(title.get_child_count() > 5, "title constructs hall+menu")
+	title.queue_free()
+	await get_tree().process_frame
 
 	var hub: Node = load("res://scenes/hub.tscn").instantiate()
 	add_child(hub)

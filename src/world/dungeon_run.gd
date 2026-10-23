@@ -13,7 +13,7 @@ func _ready() -> void:
 	var def: DungeonTypeDef = ContentDB.get_dungeon(GameSession.run.dungeon_id)
 	var builder := DungeonBuilder.new()
 	var markers: Dictionary = builder.build(self, GameSession.run.blueprint, def)
-	_spawn_player(markers["player"])
+	_spawn_player(markers["player"], float(markers.get("player_yaw", 0.0)))
 	_spawn_monsters(markers["spawns"])
 	_spawn_chests(markers["chests"])
 	_spawn_exit(markers["exit"])
@@ -24,10 +24,11 @@ func _ready() -> void:
 	GameSession.ui_open = false
 
 
-func _spawn_player(at: Vector3) -> void:
+func _spawn_player(at: Vector3, yaw: float = 0.0) -> void:
 	_player = Player.new()
 	add_child(_player)
 	_player.global_position = at
+	_player.rotation.y = yaw
 	_player.died.connect(_on_player_died)
 
 
@@ -52,7 +53,7 @@ func _spawn_chests(positions: Array) -> void:
 		var chest := Interactable.new()
 		chest.prompt = "Open chest"
 		chest.consume_on_use = true
-		var visual := Greybox.make_box(Vector3(0.9, 0.7, 0.6), Color(0.45, 0.28, 0.12))
+		var visual := DungeonKit.chest_visual()
 		visual.position = Vector3(0, 0.0, 0)
 		chest.add_child(visual)
 		var shape := CollisionShape3D.new()
@@ -71,8 +72,8 @@ func _spawn_exit(at: Variant) -> void:
 	_exit = Interactable.new()
 	_exit.prompt = "Leave through the gate"
 	_exit.locked = true
-	var visual := Greybox.make_box(Vector3(1.6, 2.6, 0.35), Color(0.35, 0.85, 0.7), false)
-	visual.position = Vector3(0, 1.3, 0)
+	var visual := DungeonKit.gate_visual()
+	visual.position = Vector3(0, 0.0, 0)
 	_exit.add_child(visual)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -96,16 +97,21 @@ func _on_monster_died(monster: Monster) -> void:
 	GameSession.record_kill(monster.def.id)
 	if monster.def.drop_chance >= 1.0 or GameSession.randf() <= monster.def.drop_chance:
 		var loot := GameSession.roll_table(monster.def.loot_table_id)
-		for item in loot:
-			var drop := LootDrop.new()
-			add_child(drop)
-			drop.setup(item)
-			drop.global_position = monster.global_position + Vector3(0, 0.2, 0)
+		var drop_at := monster.global_position + Vector3(0, 0.2, 0)
+		call_deferred("_spawn_loot_drops", loot, drop_at)
 	if monster.def.is_boss:
 		GameSession.run.boss_defeated = true
 		if _exit:
 			_exit.locked = false
 			GameSession.log_message.emit("The gate unlocks.", Color(0.55, 1.0, 0.8))
+
+
+func _spawn_loot_drops(loot: Array, at: Vector3) -> void:
+	for i in loot.size():
+		var drop := LootDrop.new()
+		add_child(drop)
+		drop.setup(loot[i])
+		drop.global_position = at + Vector3(0.12 * float(i), 0.0, 0.08 * float(i))
 
 
 func _on_chest_opened(_by: Node, chest: Interactable) -> void:
@@ -115,11 +121,8 @@ func _on_chest_opened(_by: Node, chest: Interactable) -> void:
 		if dungeon != null and not String(dungeon.loot_table_id).is_empty():
 			table_id = dungeon.loot_table_id
 	var loot := GameSession.roll_table(table_id)
-	for i in loot.size():
-		var drop := LootDrop.new()
-		add_child(drop)
-		drop.setup(loot[i])
-		drop.global_position = chest.global_position + Vector3(0.4 * float(i), 0.3, 0.4)
+	var drop_at: Vector3 = chest.global_position + Vector3(0.0, 0.3, 0.4)
+	call_deferred("_spawn_loot_drops", loot, drop_at)
 	if is_instance_valid(chest):
 		chest.queue_free()
 

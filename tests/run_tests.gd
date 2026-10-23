@@ -11,6 +11,9 @@ const TestDungeonGenScript := preload("res://tests/test_dungeon_gen.gd")
 const TestSaveScript := preload("res://tests/test_save.gd")
 const TestContentScript := preload("res://tests/test_content.gd")
 const TestCommandScript := preload("res://tests/test_command.gd")
+const TestSettingsScript := preload("res://tests/test_settings.gd")
+const TestVisualsScript := preload("res://tests/test_visuals.gd")
+const TestUIScript := preload("res://tests/test_ui.gd")
 
 
 func _initialize() -> void:
@@ -29,6 +32,9 @@ func _boot_autoloads() -> void:
 	var session := root.get_node_or_null("GameSession")
 	if session and session.has_method("reset_profile"):
 		session.reset_profile(false)
+	var settings := root.get_node_or_null("SettingsService")
+	if settings and settings.has_method("apply"):
+		settings.apply()
 
 
 func _run() -> int:
@@ -42,6 +48,9 @@ func _run() -> int:
 		_suite(TestSaveScript, "save"),
 		_suite(TestContentScript, "content"),
 		_suite(TestCommandScript, "command"),
+		_suite(TestSettingsScript, "settings"),
+		_suite(TestVisualsScript, "visuals"),
+		_suite(TestUIScript, "ui"),
 		_smoke(),
 	]
 
@@ -79,6 +88,9 @@ func _smoke() -> DDTest:
 	var builder := DungeonBuilder.new()
 	var markers: Dictionary = builder.build(world, blueprint, def, false)
 	t.assert_true(markers.has("player"), "player marker")
+	t.assert_true(markers.has("player_yaw"), "spawn faces a doorway")
+	var start := blueprint.start_room()
+	t.assert_true(start != null and start.facing_yaw() == float(markers["player_yaw"]), "yaw matches start doors")
 	t.assert_gt(float((markers["spawns"] as Array).size()), 0.0, "monster markers")
 	t.assert_true(markers["exit"] != null, "exit marker")
 	t.assert_true(markers["nav"] != null, "nav region")
