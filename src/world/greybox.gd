@@ -66,15 +66,14 @@ static func make_capsule_visual(radius: float, height: float, color: Color) -> M
 
 
 ## AABB of a node in its parent's space.
-## Skinned Quaternius GLBs keep a Blender armature scale of 100 while mesh
-## vertices may be in a different bind space; unskinned mesh AABBs then inflate
-## by 100x and `fit_height` shrinks the posed character to a speck. Prefer the
+## Skinned GLBs can keep a tiny rest-pose bone AABB while unskinned mesh AABBs
+## sit in a different bind space; `fit_height` then overscales. Prefer the
 ## skeleton bone AABB when a Skeleton3D is present.
 static func visual_aabb(root: Node) -> AABB:
 	var mesh_acc: Array = [false, AABB()]
 	var bone_acc: Array = [false, AABB()]
 	_accum_aabb(root, Transform3D.IDENTITY, mesh_acc, bone_acc)
-	if bone_acc[0] and (bone_acc[1] as AABB).size.y > 0.05:
+	if bone_acc[0] and (bone_acc[1] as AABB).size.length() > 0.0005:
 		return bone_acc[1]
 	return mesh_acc[1] if mesh_acc[0] else AABB()
 

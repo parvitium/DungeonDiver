@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cip21vr7vi25y"
-path="res://.godot/imported/quaternius_ghostskull.glb-8f56a3363b15cfdeaba0c94b4349fef8.scn"
+uid="uid://wp363byohlih"
+path="res://.godot/imported/pbr_skeleton.glb-6f48215618f46b349610c6da091597f4.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/quaternius_ghostskull.glb"
-dest_files=["res://.godot/imported/quaternius_ghostskull.glb-8f56a3363b15cfdeaba0c94b4349fef8.scn"]
+source_file="res://assets/models/monsters/pbr_skeleton.glb"
+dest_files=["res://.godot/imported/pbr_skeleton.glb-6f48215618f46b349610c6da091597f4.scn"]
 
 [params]
 

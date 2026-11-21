@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://dfbxg2r3i7qsc"
-path="res://.godot/imported/quaternius_skeleton.glb-1f0ed878084fefcb7be4f5d9c67ae0f8.scn"
+uid="uid://cadi7iptkyu4h"
+path="res://.godot/imported/pbr_troll.glb-2fc3de913103ff5632d36dff5afef549.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/quaternius_skeleton.glb"
-dest_files=["res://.godot/imported/quaternius_skeleton.glb-1f0ed878084fefcb7be4f5d9c67ae0f8.scn"]
+source_file="res://assets/models/monsters/pbr_troll.glb"
+dest_files=["res://.godot/imported/pbr_troll.glb-2fc3de913103ff5632d36dff5afef549.scn"]
 
 [params]
 

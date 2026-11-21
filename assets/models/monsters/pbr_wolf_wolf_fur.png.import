@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d1miylwv5f6et"
-path="res://.godot/imported/quaternius_skeleton_Zombie_Atlas.png-7580ce24f046f930c445fd96711599aa.ctex"
+uid="uid://jq7nr754jjlw"
+path="res://.godot/imported/pbr_wolf_wolf_fur.png-554e3d2126d40c6423a06df7ae7a7fc5.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "ae8ba728fcf7e919305cebabeacf184e"
+"md5": "df871b3e00427e7e8a66dc8324851bf7"
 }
 
 [deps]
 
-source_file="res://assets/models/monsters/quaternius_skeleton_Zombie_Atlas.png"
-dest_files=["res://.godot/imported/quaternius_skeleton_Zombie_Atlas.png-7580ce24f046f930c445fd96711599aa.ctex"]
+source_file="res://assets/models/monsters/pbr_wolf_wolf_fur.png"
+dest_files=["res://.godot/imported/pbr_wolf_wolf_fur.png-554e3d2126d40c6423a06df7ae7a7fc5.ctex"]
 
 [params]
 

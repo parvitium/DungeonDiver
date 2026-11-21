@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://d2pf2jg2ruq3d"
-path="res://.godot/imported/quaternius_orc.glb-10efd32e326e71156b21b3cdd429462e.scn"
+uid="uid://dr30xhcd6c51u"
+path="res://.godot/imported/pbr_lich.glb-4418e496091ae93591e287728544b129.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/quaternius_orc.glb"
-dest_files=["res://.godot/imported/quaternius_orc.glb-10efd32e326e71156b21b3cdd429462e.scn"]
+source_file="res://assets/models/monsters/pbr_lich.glb"
+dest_files=["res://.godot/imported/pbr_lich.glb-4418e496091ae93591e287728544b129.scn"]
 
 [params]
 

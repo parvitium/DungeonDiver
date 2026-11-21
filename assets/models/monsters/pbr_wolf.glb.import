@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cf0sd3l1y0dh4"
-path="res://.godot/imported/quaternius_ghost.glb-f8557939548ca4a0b67697a6bb60ad30.scn"
+uid="uid://dtih0o5p6s7iw"
+path="res://.godot/imported/pbr_wolf.glb-af53680d1ab4ec6cfdfea1ae6d986d72.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/quaternius_ghost.glb"
-dest_files=["res://.godot/imported/quaternius_ghost.glb-f8557939548ca4a0b67697a6bb60ad30.scn"]
+source_file="res://assets/models/monsters/pbr_wolf.glb"
+dest_files=["res://.godot/imported/pbr_wolf.glb-af53680d1ab4ec6cfdfea1ae6d986d72.scn"]
 
 [params]
 
