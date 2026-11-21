@@ -7,7 +7,7 @@ This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Dun
 ## Requirements
 
 - [Godot 4.7.x](https://godotengine.org/download/linux/) (4.7.2 used in CI)
-- No paid assets or services. Code is MIT. Dungeon/monster art is CC0 (Poly Haven, KayKit, Quaternius, Kenney); remaining greybox is original CC0. See [`LICENSE`](LICENSE) and [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).
+- No paid assets or services. Code is MIT. Dungeon/monster art is CC0 (Poly Haven, Quaternius); remaining greybox is original CC0. See [`LICENSE`](LICENSE) and [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).
 
 ## How to run
 
@@ -58,8 +58,9 @@ Hub: click a dungeon card to select it, click again to enter at the chosen depth
 Dungeon walls, floors and ceilings are PBR-textured primitives (Poly Haven 1K).
 Rooms get wall torches with warm light and one shadow-casting spotlight, plus
 fog / SSAO. Corner props (crates, barrels, rubble, pillars) stay off the
-walk paths. Monsters use rigged, animated CC0 models (KayKit skeletons,
-Quaternius wolf, Kenney orc). Hitboxes and combat numbers are unchanged.
+walk paths. Monsters use one consistent Quaternius CC0 set (undead/zombie,
+wolf, ghost, ghost-skull, orc) with looping idle/walk/run. Hitboxes and combat
+numbers are unchanged.
 
 The main menu and level-select hub are intentionally the original greybox UI.
 
@@ -79,4 +80,4 @@ Drop a `ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable` `.tres` into `d
 ## License
 
 - **Code** — MIT ([`LICENSE`](LICENSE))
-- **Assets** — CC0 1.0 (Poly Haven / KayKit / Quaternius / Kenney third-party files, plus original greybox). See [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).
+- **Assets** — CC0 1.0 (Poly Haven / Quaternius third-party files, plus original greybox). See [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).

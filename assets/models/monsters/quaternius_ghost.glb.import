@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cswc5j750c47c"
-path="res://.godot/imported/skeleton_mage.glb-e250af8eee9c5b4faa82be5199218125.scn"
+uid="uid://cf0sd3l1y0dh4"
+path="res://.godot/imported/quaternius_ghost.glb-f8557939548ca4a0b67697a6bb60ad30.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/skeleton_mage.glb"
-dest_files=["res://.godot/imported/skeleton_mage.glb-e250af8eee9c5b4faa82be5199218125.scn"]
+source_file="res://assets/models/monsters/quaternius_ghost.glb"
+dest_files=["res://.godot/imported/quaternius_ghost.glb-f8557939548ca4a0b67697a6bb60ad30.scn"]
 
 [params]
 

@@ -48,11 +48,17 @@ func _ready() -> void:
 		add_child(mob)
 		mob.setup(mdef, 1)
 		mob.set_physics_process(false)
-		mob.global_position = start + Vector3(-4.0 + float(i) * 2.0, 0.05, 4.6)
-		mob.look_at(start + Vector3(-4.0 + float(i) * 2.0, 0.05, 0.0), Vector3.UP)
+		mob.global_position = start + Vector3(-2.8 + float(i) * 1.4, 0.05, 4.2)
+		mob.look_at(start + Vector3(-2.8 + float(i) * 1.4, 0.05, 0.0), Vector3.UP)
 		mobs.append(mob)
-	cam.global_position = start + Vector3(0.0, 1.85, 0.15)
-	cam.look_at(start + Vector3(0.0, 0.95, 4.6), Vector3.UP)
+	var fill := OmniLight3D.new()
+	fill.light_color = Color(1.0, 0.82, 0.62)
+	fill.light_energy = 1.6
+	fill.omni_range = 9.0
+	fill.position = start + Vector3(0.0, 2.4, 3.4)
+	add_child(fill)
+	cam.global_position = start + Vector3(0.0, 1.75, -1.4)
+	cam.look_at(start + Vector3(0.0, 0.95, 4.2), Vector3.UP)
 	await _settle()
 	_save(tag + "_mobs")
 

@@ -8,59 +8,59 @@ const CAPSULE_HEIGHT := 1.6
 
 const CONFIG := {
 	"skeleton": {
-		"scene": "res://assets/models/monsters/skeleton_minion.glb",
-		"height": 1.65,
+		"scene": "res://assets/models/monsters/quaternius_skeleton.glb",
+		"height": 1.7,
 		"yaw": PI,
-		"label_y": 1.9,
+		"label_y": 1.95,
 		"idle": "Idle",
-		"walk": "Walking_A",
-		"run": "Running_A",
-		"attack": "1H_Melee_Attack_Chop",
-		"death": "Death_A",
+		"walk": "Walk",
+		"run": "Run",
+		"attack": "Punch",
+		"death": "Death",
 	},
 	"cave_wolf": {
-		"scene": "res://assets/models/monsters/wolf.glb",
+		"scene": "res://assets/models/monsters/quaternius_wolf.glb",
 		"height": 1.05,
 		"yaw": PI,
 		"label_y": 1.35,
-		"idle": "AnimalArmature|Idle",
-		"walk": "AnimalArmature|Walk",
-		"run": "AnimalArmature|Gallop",
-		"attack": "AnimalArmature|Attack",
-		"death": "AnimalArmature|Death",
+		"idle": "Idle",
+		"walk": "Walk",
+		"run": "Gallop",
+		"attack": "Attack",
+		"death": "Death",
 	},
 	"wraith": {
-		"scene": "res://assets/models/monsters/skeleton_rogue.glb",
-		"height": 1.72,
+		"scene": "res://assets/models/monsters/quaternius_ghost.glb",
+		"height": 1.7,
 		"yaw": PI,
 		"label_y": 2.0,
-		"idle": "Idle",
-		"walk": "Walking_A",
-		"run": "Running_A",
-		"attack": "Spellcast_Shoot",
-		"death": "Death_A",
+		"idle": "Flying_Idle",
+		"walk": "Fast_Flying",
+		"run": "Fast_Flying",
+		"attack": "Punch",
+		"death": "Death",
 	},
 	"lich": {
-		"scene": "res://assets/models/monsters/skeleton_mage.glb",
-		"height": 1.82,
+		"scene": "res://assets/models/monsters/quaternius_ghostskull.glb",
+		"height": 1.8,
 		"yaw": PI,
-		"label_y": 2.15,
-		"idle": "Idle",
-		"walk": "Walking_A",
-		"run": "Walking_B",
-		"attack": "Spellcast_Shoot",
-		"death": "Death_A",
+		"label_y": 2.1,
+		"idle": "Flying_Idle",
+		"walk": "Fast_Flying",
+		"run": "Fast_Flying",
+		"attack": "Punch",
+		"death": "Death",
 	},
 	"cave_troll": {
-		"scene": "res://assets/models/monsters/kenney_orc.glb",
-		"height": 1.85,
-		"yaw": PI * 1.5,
-		"label_y": 2.15,
-		"idle": "idle",
-		"walk": "walk",
-		"run": "sprint",
-		"attack": "attack-melee-right",
-		"death": "die",
+		"scene": "res://assets/models/monsters/quaternius_orc.glb",
+		"height": 1.9,
+		"yaw": PI,
+		"label_y": 2.2,
+		"idle": "Idle",
+		"walk": "Walk",
+		"run": "Run",
+		"attack": "Punch",
+		"death": "Death",
 	},
 }
 
@@ -101,17 +101,27 @@ static func attach(host: Node3D, def: MonsterDef) -> Dictionary:
 	return info
 
 
-static func play(info: Dictionary, kind: String, _loop: bool) -> bool:
+static func play(info: Dictionary, kind: String, loop: bool) -> bool:
 	var anim: AnimationPlayer = info.get("anim")
 	if anim == null:
 		return false
 	var clip := resolve_clip(anim, info.get("config", {}), kind)
 	if clip.is_empty():
 		return false
+	_apply_loop(anim, clip, loop)
 	if anim.current_animation == clip and anim.is_playing():
 		return true
 	anim.play(clip)
 	return true
+
+
+static func _apply_loop(anim: AnimationPlayer, clip: String, loop: bool) -> void:
+	if not anim.has_animation(clip):
+		return
+	var res: Animation = anim.get_animation(clip)
+	if res == null:
+		return
+	res.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
 
 
 static func resolve_clip(anim: AnimationPlayer, cfg: Dictionary, kind: String) -> String:
@@ -124,13 +134,13 @@ static func resolve_clip(anim: AnimationPlayer, cfg: Dictionary, kind: String) -
 	var keys: PackedStringArray = PackedStringArray()
 	match kind:
 		"idle":
-			keys = PackedStringArray(["idle"])
+			keys = PackedStringArray(["idle", "flying_idle"])
 		"walk":
-			keys = PackedStringArray(["walk", "walking"])
+			keys = PackedStringArray(["walk", "walking", "flying"])
 		"run":
-			keys = PackedStringArray(["run", "sprint", "gallop"])
+			keys = PackedStringArray(["run", "sprint", "gallop", "fast_flying"])
 		"attack":
-			keys = PackedStringArray(["attack", "spellcast_shoot", "melee", "chop"])
+			keys = PackedStringArray(["attack", "punch", "headbutt", "melee", "chop"])
 		"death":
 			keys = PackedStringArray(["death", "die"])
 		_:

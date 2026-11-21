@@ -65,11 +65,18 @@ static func make_capsule_visual(radius: float, height: float, color: Color) -> M
 	return mesh_instance
 
 
-## AABB of every MeshInstance3D under `root`, in `root`'s parent space.
+## AABB of a node in its parent's space.
+## Skinned Quaternius GLBs keep a Blender armature scale of 100 while mesh
+## vertices may be in a different bind space; unskinned mesh AABBs then inflate
+## by 100x and `fit_height` shrinks the posed character to a speck. Prefer the
+## skeleton bone AABB when a Skeleton3D is present.
 static func visual_aabb(root: Node) -> AABB:
-	var acc: Array = [false, AABB()]
-	_accum_aabb(root, Transform3D.IDENTITY, acc)
-	return acc[1] if acc[0] else AABB()
+	var mesh_acc: Array = [false, AABB()]
+	var bone_acc: Array = [false, AABB()]
+	_accum_aabb(root, Transform3D.IDENTITY, mesh_acc, bone_acc)
+	if bone_acc[0] and (bone_acc[1] as AABB).size.y > 0.05:
+		return bone_acc[1]
+	return mesh_acc[1] if mesh_acc[0] else AABB()
 
 
 static func fit_height(root: Node3D, height: float, snap_ground: bool = true) -> void:
@@ -90,10 +97,14 @@ static func fit_max_extent(root: Node3D, max_dim: float) -> void:
 	root.scale *= max_dim / longest
 
 
-static func _accum_aabb(n: Node, xf: Transform3D, acc: Array) -> void:
+static func _accum_aabb(n: Node, xf: Transform3D, mesh_acc: Array, bone_acc: Array) -> void:
 	var next := xf
 	if n is Node3D:
 		next = xf * (n as Node3D).transform
+	if n is Skeleton3D:
+		var sk := n as Skeleton3D
+		for b in sk.get_bone_count():
+			_expand(bone_acc, next * sk.get_bone_global_pose(b).origin)
 	if n is MeshInstance3D and (n as MeshInstance3D).mesh:
 		var local: AABB = (n as MeshInstance3D).get_aabb()
 		for i in 8:
@@ -102,11 +113,14 @@ static func _accum_aabb(n: Node, xf: Transform3D, acc: Array) -> void:
 				local.size.y if (i & 2) else 0.0,
 				local.size.z if (i & 4) else 0.0
 			)
-			var world: Vector3 = next * corner
-			if not acc[0]:
-				acc[0] = true
-				acc[1] = AABB(world, Vector3.ZERO)
-			else:
-				acc[1] = (acc[1] as AABB).expand(world)
+			_expand(mesh_acc, next * corner)
 	for child in n.get_children():
-		_accum_aabb(child, next, acc)
+		_accum_aabb(child, next, mesh_acc, bone_acc)
+
+
+static func _expand(acc: Array, world: Vector3) -> void:
+	if not acc[0]:
+		acc[0] = true
+		acc[1] = AABB(world, Vector3.ZERO)
+	else:
+		acc[1] = (acc[1] as AABB).expand(world)

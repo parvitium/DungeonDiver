@@ -12,7 +12,7 @@ Greybox nodes are still tagged with `asset_socket` metadata:
 
 The hub / level-select scene is unchanged and still uses original greybox
 primitives. Dungeon rooms load CC0 PBR textures (Poly Haven) and CC0 GLBs
-(KayKit, Quaternius, Kenney).
+(Quaternius monsters and props).
 
 Original / self-made greybox helpers remain CC0 1.0. Code is MIT. See the
 repository `LICENSE`.

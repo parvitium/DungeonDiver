@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://djjlm58sh1fc8"
-path="res://.godot/imported/skeleton_minion.glb-b1566a4ef29a1cec2653d1be3f445adf.scn"
+uid="uid://d2pf2jg2ruq3d"
+path="res://.godot/imported/quaternius_orc.glb-10efd32e326e71156b21b3cdd429462e.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/skeleton_minion.glb"
-dest_files=["res://.godot/imported/skeleton_minion.glb-b1566a4ef29a1cec2653d1be3f445adf.scn"]
+source_file="res://assets/models/monsters/quaternius_orc.glb"
+dest_files=["res://.godot/imported/quaternius_orc.glb-10efd32e326e71156b21b3cdd429462e.scn"]
 
 [params]
 

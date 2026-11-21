@@ -10,6 +10,19 @@ static func run() -> DDTest:
 		var cfg: Dictionary = MonsterVisuals.config_for(StringName(id))
 		t.assert_true(not cfg.is_empty(), "%s visual config" % id)
 		t.assert_true(ResourceLoader.exists(String(cfg["scene"])), "%s glb present" % id)
+		var def: MonsterDef = null
+		for m in Catalog.all_monsters():
+			if String(m.id) == id:
+				def = m
+				break
+		var probe := Node3D.new()
+		if def:
+			MonsterVisuals.attach(probe, def)
+			var vis := probe.get_node_or_null("BodyVisual") as Node3D
+			if vis:
+				var aabb := Greybox.visual_aabb(vis)
+				t.assert_true(aabb.size.y > 0.8 and aabb.size.y < 2.6, "%s fitted height" % id)
+		probe.free()
 
 	for folder in [
 		"res://assets/textures/castle_brick_01/diff.jpg",
@@ -55,7 +68,13 @@ static func run() -> DDTest:
 	var mob: Node = monster_script.new()
 	world.add_child(mob)
 	mob.set_physics_process(false)
-	mob.call("setup", Catalog.all_monsters()[0], 1)
+	var skel: MonsterDef = null
+	for m in Catalog.all_monsters():
+		if String(m.id) == "skeleton":
+			skel = m
+			break
+	t.assert_true(skel != null, "skeleton def")
+	mob.call("setup", skel, 1)
 	var hurt := mob.get_node("Hurtbox") as CollisionShape3D
 	t.assert_true(hurt != null, "hurtbox node")
 	var cap := hurt.shape as CapsuleShape3D
@@ -68,6 +87,7 @@ static func run() -> DDTest:
 	if vis:
 		var aabb := Greybox.visual_aabb(vis)
 		t.assert_true(aabb.size.y > 1.2 and aabb.size.y < 2.4, "fitted visual height")
+	_assert_locomotion_loops(t, mob)
 	mob.free()
 
 	# Hub construction must still work; this pass does not restyle the menu.
@@ -77,6 +97,46 @@ static func run() -> DDTest:
 
 	world.free()
 	return t
+
+
+static func _assert_locomotion_loops(t: DDTest, mob: Node) -> void:
+	var anim := _find_anim(mob)
+	t.assert_true(anim != null, "animation player")
+	if anim == null:
+		return
+	var info := {"anim": anim, "config": MonsterVisuals.config_for(&"skeleton")}
+	t.assert_true(MonsterVisuals.play(info, "idle", true), "play idle")
+	anim.advance(3.0)
+	t.assert_true(anim.is_playing(), "idle still playing after 3s")
+	var idle_clip := anim.current_animation
+	t.assert_true(anim.has_animation(idle_clip), "idle clip exists")
+	if anim.has_animation(idle_clip):
+		t.assert_eq(
+			anim.get_animation(idle_clip).loop_mode,
+			Animation.LOOP_LINEAR,
+			"idle loop_mode"
+		)
+	t.assert_true(MonsterVisuals.play(info, "walk", true), "play walk")
+	anim.advance(3.0)
+	t.assert_true(anim.is_playing(), "walk still playing after 3s")
+	t.assert_true(MonsterVisuals.play(info, "attack", false), "play attack")
+	var atk := anim.current_animation
+	if anim.has_animation(atk):
+		t.assert_eq(
+			anim.get_animation(atk).loop_mode,
+			Animation.LOOP_NONE,
+			"attack plays once"
+		)
+
+
+static func _find_anim(root: Node) -> AnimationPlayer:
+	if root is AnimationPlayer:
+		return root as AnimationPlayer
+	for child in root.get_children():
+		var found := _find_anim(child)
+		if found:
+			return found
+	return null
 
 
 static func _count_type(root: Node, type_name: String) -> int:

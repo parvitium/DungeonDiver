@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b6eec4bumfnua"
-path="res://.godot/imported/skeleton_rogue.glb-7445e97653875e035568ef1ee5f35c8a.scn"
+uid="uid://cayt7mnou8w68"
+path="res://.godot/imported/quaternius_wolf.glb-01880c7d34d79bbbd7885ad9864ff615.scn"
 
 [deps]
 
-source_file="res://assets/models/monsters/skeleton_rogue.glb"
-dest_files=["res://.godot/imported/skeleton_rogue.glb-7445e97653875e035568ef1ee5f35c8a.scn"]
+source_file="res://assets/models/monsters/quaternius_wolf.glb"
+dest_files=["res://.godot/imported/quaternius_wolf.glb-01880c7d34d79bbbd7885ad9864ff615.scn"]
 
 [params]
 
