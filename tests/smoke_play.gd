@@ -29,6 +29,15 @@ func _ready() -> void:
 	GameSession.tick(0.05)
 	failed += _check(player.global_position.distance_to(start) > 0.05, "session inbox moves pawn")
 
+	var yaw_before := player.rotation.y
+	var look_cmd := PlayerCommand.new()
+	look_cmd.look_delta = Vector2(90, 25)
+	GameSession.submit_command(look_cmd)
+	GameSession.tick(0.016)
+	failed += _check(player.rotation.y != yaw_before, "session inbox yaws body")
+	failed += _check(player.head_pitch() != 0.0, "session inbox pitches head")
+	failed += _check(absf(player.head_pitch()) <= deg_to_rad(85.0) + 0.001, "pitch stays clamped")
+
 	var mob := Monster.new()
 	var monster_def: MonsterDef = ContentDB.get_monster(&"skeleton")
 	world.add_child(mob)
