@@ -19,6 +19,8 @@ var rng: GameRNG = GameRNG.new(1)
 ## Seeded monster patrol / AI. Independent of loot.
 var ai_rng: GameRNG = GameRNG.new(1)
 
+var look_settings: LookSettings = LookSettings.new()
+
 var _command_inbox: Array[PlayerCommand] = []
 
 
@@ -34,6 +36,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	process_physics_priority = 20
 	reset_profile(false)
+	look_settings.load_from_disk()
 
 
 func reset_profile(emit_change: bool = true) -> void:

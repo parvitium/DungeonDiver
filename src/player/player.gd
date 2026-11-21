@@ -34,11 +34,14 @@ var alive: bool = true
 var input_enabled: bool = true
 
 var _camera: Camera3D
+var _head: Node3D
 var _melee_area: Area3D
 var _interact_ray: RayCast3D
 var _weapon_visual: MeshInstance3D
 var _shield_visual: MeshInstance3D
 var _focus_prompt: String = ""
+var _consume_click_for_capture: bool = false
+var _rig_built: bool = false
 
 
 func _ready() -> void:
@@ -50,9 +53,15 @@ func _ready() -> void:
 	_sync_from_profile()
 	if not GameSession.profile_changed.is_connected(_on_profile_changed):
 		GameSession.profile_changed.connect(_on_profile_changed)
+	var win := get_window()
+	if win and not win.focus_entered.is_connected(_on_window_focus):
+		win.focus_entered.connect(_on_window_focus)
 
 
 func _build_rig() -> void:
+	if _rig_built:
+		return
+	_rig_built = true
 	var capsule := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.38
@@ -61,21 +70,23 @@ func _build_rig() -> void:
 	capsule.position = Vector3(0, 0.85, 0)
 	add_child(capsule)
 
-	var head := Node3D.new()
-	head.name = "Head"
-	head.position = Vector3(0, 1.55, 0)
-	add_child(head)
+	_head = Node3D.new()
+	_head.name = "Head"
+	_head.position = Vector3(0, 1.55, 0)
+	add_child(_head)
 
 	_camera = Camera3D.new()
+	_camera.name = "Camera3D"
 	_camera.fov = 75.0
-	head.add_child(_camera)
+	_camera.current = true
+	_head.add_child(_camera)
 
 	_interact_ray = RayCast3D.new()
 	_interact_ray.target_position = Vector3(0, 0, -2.6)
 	_interact_ray.collision_mask = DD.INTERACT_LAYER
 	_interact_ray.collide_with_areas = true
 	_interact_ray.collide_with_bodies = false
-	head.add_child(_interact_ray)
+	_head.add_child(_interact_ray)
 
 	_melee_area = Area3D.new()
 	_melee_area.position = Vector3(0, 0, -1.4)
@@ -88,7 +99,7 @@ func _build_rig() -> void:
 	melee_box.size = Vector3(1.3, 1.1, 1.8)
 	melee_shape.shape = melee_box
 	_melee_area.add_child(melee_shape)
-	head.add_child(_melee_area)
+	_head.add_child(_melee_area)
 
 	_weapon_visual = MeshInstance3D.new()
 	_weapon_visual.name = "WeaponVisual"
@@ -98,7 +109,7 @@ func _build_rig() -> void:
 	_weapon_visual.material_override = Greybox.make_material(Color(0.7, 0.7, 0.75))
 	_weapon_visual.position = Vector3(0.35, -0.28, -0.45)
 	_weapon_visual.rotation_degrees = Vector3(12, 8, 18)
-	head.add_child(_weapon_visual)
+	_head.add_child(_weapon_visual)
 
 	_shield_visual = MeshInstance3D.new()
 	_shield_visual.name = "ShieldVisual"
@@ -108,26 +119,46 @@ func _build_rig() -> void:
 	_shield_visual.material_override = Greybox.make_material(Color(0.45, 0.32, 0.2))
 	_shield_visual.position = Vector3(-0.32, -0.22, -0.4)
 	_shield_visual.visible = false
-	head.add_child(_shield_visual)
+	_head.add_child(_shield_visual)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not input_enabled or GameSession.ui_open:
-		return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+func _input(event: InputEvent) -> void:
+	if handle_look_input(event) and is_inside_tree():
+		var vp := get_viewport()
+		if vp:
+			vp.set_input_as_handled()
+
+
+func handle_look_input(event: InputEvent) -> bool:
+	if not input_enabled:
+		return false
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var ctx := MouseCapture.context_for(true, GameSession.ui_open)
+		if MouseCapture.should_recapture_click(ctx, MouseCapture.is_captured()):
+			MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
+			_consume_click_for_capture = true
+			return true
+	if GameSession.ui_open:
+		return false
+	if event is InputEventMouseMotion and MouseCapture.allows_look():
 		pending_look += event.relative
+		return true
+	return false
 
 
 func gather_command() -> PlayerCommand:
 	var cmd := PlayerCommand.new()
 	if not input_enabled or GameSession.ui_open or not alive:
+		_consume_click_for_capture = false
+		pending_look = Vector2.ZERO
 		return cmd
 	cmd.move = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	cmd.look_delta = pending_look
+	cmd.look_delta = GameSession.look_settings.scale_delta(pending_look)
 	pending_look = Vector2.ZERO
 	cmd.jump = Input.is_action_just_pressed("jump")
 	cmd.sprint = Input.is_action_pressed("sprint")
-	cmd.melee = Input.is_action_just_pressed("melee")
+	cmd.melee = Input.is_action_just_pressed("melee") and not _consume_click_for_capture
+	_consume_click_for_capture = false
 	cmd.block = Input.is_action_pressed("block")
 	cmd.cast = Input.is_action_just_pressed("cast")
 	cmd.interact = Input.is_action_just_pressed("interact")
@@ -155,9 +186,20 @@ func _physics_process(_delta: float) -> void:
 
 func _apply_look(look_delta: Vector2) -> void:
 	rotate_y(-look_delta.x * MOUSE_SENS)
-	look_pitch = clampf(look_pitch - look_delta.y * MOUSE_SENS, deg_to_rad(-85.0), deg_to_rad(85.0))
-	if _camera:
+	look_pitch = MouseCapture.clamp_pitch(look_pitch - look_delta.y * MOUSE_SENS)
+	if _head:
+		_head.rotation.x = look_pitch
+	elif _camera:
 		_camera.get_parent().rotation.x = look_pitch
+
+
+func head_pitch() -> float:
+	return look_pitch
+
+
+func _on_window_focus() -> void:
+	if input_enabled and not GameSession.ui_open:
+		MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
 
 
 func _apply_move(cmd: PlayerCommand, delta: float, stats: StatBlock) -> void:

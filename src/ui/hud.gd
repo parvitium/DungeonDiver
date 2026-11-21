@@ -11,6 +11,7 @@ var _inv_panel: Control
 var _bestiary_panel: Control
 var _pause_panel: Control
 var _player: Player
+var _built: bool = false
 
 
 func _ready() -> void:
@@ -33,6 +34,9 @@ func bind_player(player: Player) -> void:
 
 
 func _build() -> void:
+	if _built:
+		return
+	_built = true
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -40,32 +44,42 @@ func _build() -> void:
 
 	_title = ThemeFactory.label("", 18, Color(0.9, 0.8, 0.5))
 	_title.position = Vector2(24, 16)
+	_ignore_mouse(_title)
 	root.add_child(_title)
 
 	var bars := VBoxContainer.new()
 	bars.position = Vector2(24, 48)
 	bars.custom_minimum_size = Vector2(280, 0)
+	_ignore_mouse(bars)
 	root.add_child(bars)
 	_hp_label = ThemeFactory.label("Health", 14)
 	_hp_bar = _bar(Color(0.75, 0.15, 0.15))
 	_sta_label = ThemeFactory.label("Stamina", 14)
 	_sta_bar = _bar(Color(0.2, 0.55, 0.85))
+	_ignore_mouse(_hp_label)
+	_ignore_mouse(_hp_bar)
+	_ignore_mouse(_sta_label)
+	_ignore_mouse(_sta_bar)
 	bars.add_child(_hp_label)
 	bars.add_child(_hp_bar)
 	bars.add_child(_sta_label)
 	bars.add_child(_sta_bar)
 
+	# Captured mouse is warped to the window center. These must IGNORE or they
+	# swallow every InputEventMouseMotion before Player can look.
 	var cross := ColorRect.new()
 	cross.color = Color(0.95, 0.9, 0.75, 0.85)
 	cross.size = Vector2(10, 2)
 	cross.set_anchors_preset(Control.PRESET_CENTER)
 	cross.position = Vector2(-5, -1)
+	_ignore_mouse(cross)
 	root.add_child(cross)
 	var cross2 := ColorRect.new()
 	cross2.color = Color(0.95, 0.9, 0.75, 0.85)
 	cross2.size = Vector2(2, 10)
 	cross2.set_anchors_preset(Control.PRESET_CENTER)
 	cross2.position = Vector2(-1, -5)
+	_ignore_mouse(cross2)
 	root.add_child(cross2)
 
 	_prompt = ThemeFactory.label("", 18, Color(1, 0.92, 0.65))
@@ -73,6 +87,7 @@ func _build() -> void:
 	_prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_prompt.position = Vector2(-220, -90)
 	_prompt.size = Vector2(440, 32)
+	_ignore_mouse(_prompt)
 	root.add_child(_prompt)
 
 	_log = RichTextLabel.new()
@@ -91,6 +106,7 @@ func _build() -> void:
 	hint.position = Vector2(-620, -36)
 	hint.size = Vector2(600, 24)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ignore_mouse(hint)
 	root.add_child(hint)
 
 	_inv_panel = preload("res://src/ui/inventory_panel.gd").new()
@@ -140,7 +156,7 @@ func _toggle(panel: Control) -> void:
 		if panel.has_method("refresh"):
 			panel.refresh()
 		GameSession.ui_open = true
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		MouseCapture.apply(MouseCapture.Context.DUNGEON_UI)
 	else:
 		_restore_capture()
 
@@ -154,7 +170,43 @@ func _close_all() -> void:
 
 func _restore_capture() -> void:
 	GameSession.ui_open = false
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
+
+
+func _ignore_mouse(ctrl: Control) -> void:
+	ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func is_inventory_open() -> bool:
+	return _inv_panel != null and _inv_panel.visible
+
+
+func is_bestiary_open() -> bool:
+	return _bestiary_panel != null and _bestiary_panel.visible
+
+
+func is_pause_open() -> bool:
+	return _pause_panel != null and _pause_panel.visible
+
+
+func open_inventory() -> void:
+	_toggle(_inv_panel)
+
+
+func open_bestiary() -> void:
+	_toggle(_bestiary_panel)
+
+
+func open_pause() -> void:
+	_toggle(_pause_panel)
+
+
+func close_panels() -> void:
+	_close_all()
+
+
+func pause_panel() -> Control:
+	return _pause_panel
 
 
 func _on_vitals() -> void:

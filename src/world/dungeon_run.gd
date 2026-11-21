@@ -20,8 +20,16 @@ func _ready() -> void:
 	_hud = preload("res://src/ui/hud.gd").new()
 	add_child(_hud)
 	_hud.bind_player(_player)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	GameSession.ui_open = false
+	MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
+	# Windows can drop capture if the window is not focused yet during _ready.
+	call_deferred("_ensure_capture")
+
+
+func _ensure_capture() -> void:
+	if GameSession.ui_open:
+		return
+	MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
 
 
 func _spawn_player(at: Vector3) -> void:
