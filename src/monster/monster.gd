@@ -17,7 +17,9 @@ var entity_id: String = ""
 
 var _agent: NavigationAgent3D
 var _player: Node3D
-var _visual: MeshInstance3D
+var _visual: Node3D
+var _visual_info: Dictionary = {}
+var _anim_kind: String = ""
 
 
 func setup(p_def: MonsterDef, effective_tier: int) -> void:
@@ -45,34 +47,29 @@ func sync_home() -> void:
 
 func _build() -> void:
 	var capsule := CollisionShape3D.new()
+	capsule.name = "Hurtbox"
 	var shape := CapsuleShape3D.new()
-	shape.radius = 0.4
-	shape.height = 1.6
+	shape.radius = MonsterVisuals.CAPSULE_RADIUS
+	shape.height = MonsterVisuals.CAPSULE_HEIGHT
 	capsule.shape = shape
-	capsule.position = Vector3(0, 0.8, 0)
+	capsule.position = Vector3(0, MonsterVisuals.CAPSULE_HEIGHT * 0.5, 0)
 	add_child(capsule)
 
-	_visual = Greybox.make_capsule_visual(0.38, 1.5, def.color if def else Color.RED)
-	_visual.position = Vector3(0, 0.8, 0)
-	_visual.scale = def.scale if def else Vector3.ONE
-	add_child(_visual)
-
-	if def and def.is_boss:
-		var crown := Greybox.make_box(Vector3(0.7, 0.18, 0.7), Color(0.95, 0.75, 0.2), false)
-		crown.position = Vector3(0, 1.7, 0)
-		add_child(crown)
+	_visual_info = MonsterVisuals.attach(self, def)
+	_visual = _visual_info.get("root") as Node3D
+	_anim_kind = "idle"
 
 	_agent = NavigationAgent3D.new()
 	_agent.path_desired_distance = 0.6
 	_agent.target_desired_distance = 1.1
 	_agent.avoidance_enabled = false
-	_agent.height = 1.6
-	_agent.radius = 0.4
+	_agent.height = MonsterVisuals.CAPSULE_HEIGHT
+	_agent.radius = MonsterVisuals.CAPSULE_RADIUS
 	add_child(_agent)
 
 	var label := Label3D.new()
 	label.text = def.display_name if def else "Monster"
-	label.position = Vector3(0, 1.85, 0)
+	label.position = Vector3(0, float(_visual_info.get("label_y", 1.85)), 0)
 	label.font_size = 28
 	label.modulate = Color(1, 0.9, 0.75)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -107,6 +104,7 @@ func _physics_process(delta: float) -> void:
 				_face(_player.global_position)
 				if attack_cd <= 0.0:
 					_attack()
+	_sync_locomotion_anim()
 	move_and_slide()
 
 
@@ -148,6 +146,7 @@ func _face(point: Vector3) -> void:
 
 func _attack() -> void:
 	attack_cd = def.attack_cooldown
+	_set_anim("attack", false)
 	if def.uses_ranged:
 		var bolt := Projectile.new()
 		var origin := global_position + Vector3(0, 1.2, 0)
@@ -177,9 +176,45 @@ func _die() -> void:
 	state = State.DEAD
 	collision_layer = 0
 	died.emit(self)
-	var tween := create_tween()
-	tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.25)
-	tween.tween_callback(queue_free)
+	if _set_anim("death", false):
+		var anim: AnimationPlayer = _visual_info.get("anim")
+		var wait := 1.4
+		if anim and anim.current_animation_length > 0.05:
+			wait = anim.current_animation_length + 0.2
+		if is_inside_tree():
+			get_tree().create_timer(wait).timeout.connect(queue_free)
+		else:
+			queue_free()
+	else:
+		var tween := create_tween()
+		tween.tween_property(self, "scale", Vector3(0.1, 0.1, 0.1), 0.25)
+		tween.tween_callback(queue_free)
+
+
+func _sync_locomotion_anim() -> void:
+	if state == State.DEAD:
+		return
+	if state == State.ATTACK:
+		var anim: AnimationPlayer = _visual_info.get("anim")
+		if anim and not anim.is_playing():
+			_set_anim("idle", true)
+		return
+	var speed := Vector3(velocity.x, 0, velocity.z).length()
+	if speed > 2.4 and state == State.CHASE:
+		_set_anim("run", true)
+	elif speed > 0.35:
+		_set_anim("walk", true)
+	else:
+		_set_anim("idle", true)
+
+
+func _set_anim(kind: String, loop: bool) -> bool:
+	if kind == _anim_kind and kind != "attack":
+		return _visual_info.get("anim") != null
+	if MonsterVisuals.play(_visual_info, kind, loop):
+		_anim_kind = kind
+		return true
+	return false
 
 
 func _pick_patrol() -> void:

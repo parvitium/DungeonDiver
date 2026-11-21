@@ -22,8 +22,24 @@ static func make_box(size: Vector3, color: Color, collision: bool = true) -> Nod
 	mesh.size = size
 	mesh_instance.mesh = mesh
 	mesh_instance.material_override = make_material(color)
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	root.add_child(mesh_instance)
 	return root
+
+
+static func make_box_with_material(size: Vector3, mat: Material, collision: bool = true) -> Node3D:
+	var root := make_box(size, Color.WHITE, collision)
+	apply_visual_material(root, mat)
+	return root
+
+
+static func apply_visual_material(root: Node, mat: Material) -> void:
+	var vis := root.get_node_or_null("BodyVisual")
+	if vis == null:
+		vis = root.find_child("BodyVisual", true, false)
+	if vis is MeshInstance3D:
+		(vis as MeshInstance3D).material_override = mat
+		(vis as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
 static func make_material(color: Color, emission: Color = Color.BLACK, emission_energy: float = 0.0) -> StandardMaterial3D:
@@ -47,3 +63,50 @@ static func make_capsule_visual(radius: float, height: float, color: Color) -> M
 	mesh_instance.mesh = mesh
 	mesh_instance.material_override = make_material(color)
 	return mesh_instance
+
+
+## AABB of every MeshInstance3D under `root`, in `root`'s parent space.
+static func visual_aabb(root: Node) -> AABB:
+	var acc: Array = [false, AABB()]
+	_accum_aabb(root, Transform3D.IDENTITY, acc)
+	return acc[1] if acc[0] else AABB()
+
+
+static func fit_height(root: Node3D, height: float, snap_ground: bool = true) -> void:
+	var aabb := visual_aabb(root)
+	if aabb.size.y < 0.0001:
+		return
+	root.scale *= height / aabb.size.y
+	if snap_ground:
+		aabb = visual_aabb(root)
+		root.position.y -= aabb.position.y
+
+
+static func fit_max_extent(root: Node3D, max_dim: float) -> void:
+	var aabb := visual_aabb(root)
+	var longest := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
+	if longest < 0.0001:
+		return
+	root.scale *= max_dim / longest
+
+
+static func _accum_aabb(n: Node, xf: Transform3D, acc: Array) -> void:
+	var next := xf
+	if n is Node3D:
+		next = xf * (n as Node3D).transform
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh:
+		var local: AABB = (n as MeshInstance3D).get_aabb()
+		for i in 8:
+			var corner := local.position + Vector3(
+				local.size.x if (i & 1) else 0.0,
+				local.size.y if (i & 2) else 0.0,
+				local.size.z if (i & 4) else 0.0
+			)
+			var world: Vector3 = next * corner
+			if not acc[0]:
+				acc[0] = true
+				acc[1] = AABB(world, Vector3.ZERO)
+			else:
+				acc[1] = (acc[1] as AABB).expand(world)
+	for child in n.get_children():
+		_accum_aabb(child, next, acc)

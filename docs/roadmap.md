@@ -21,7 +21,7 @@ Make the collection goal real without rewriting systems.
 
 - More dungeon types as `.tres` (each with palette, pool, boss, loot table)
 - More monsters and a boss per dungeon, still data-driven AI parameters
-- Replace greybox sockets with Blender `.glb` kits (floors, walls, creatures, weapons)
+- Replace remaining greybox sockets (player kit, hub) with Blender `.glb` kits
 - Affixes on items, set bonuses, stash at the hub
 - Classes / races (the original README pitch) as profile flags that tweak `StatBlock`
 - Audio: footsteps, hits, dungeon beds (CC0 or original)

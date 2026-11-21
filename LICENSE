@@ -3,10 +3,11 @@ DungeonDiver
 Code (GDScript, project configuration, tests, documentation, and CI) is
 released under the MIT License. See the MIT text below.
 
-Art and greybox assets in this repository — including `icon.svg`,
-code-generated primitives, and files under `assets/` — are original /
-self-made and dedicated to the public domain under CC0 1.0 Universal
-(https://creativecommons.org/publicdomain/zero/1.0/).
+Art in this repository is dedicated to the public domain under CC0 1.0
+Universal (https://creativecommons.org/publicdomain/zero/1.0/). That includes
+original greybox primitives and `icon.svg`, plus third-party CC0 files under
+`assets/` (Poly Haven, KayKit, Quaternius, Kenney). See
+`assets/ASSET_LICENSES.md` for per-file sources.
 
 --------------------------------------------------------------------------
 

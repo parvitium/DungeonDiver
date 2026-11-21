@@ -11,6 +11,7 @@ const TestDungeonGenScript := preload("res://tests/test_dungeon_gen.gd")
 const TestSaveScript := preload("res://tests/test_save.gd")
 const TestContentScript := preload("res://tests/test_content.gd")
 const TestCommandScript := preload("res://tests/test_command.gd")
+const TestVisualsScript := preload("res://tests/test_visuals.gd")
 
 
 func _initialize() -> void:
@@ -42,6 +43,7 @@ func _run() -> int:
 		_suite(TestSaveScript, "save"),
 		_suite(TestContentScript, "content"),
 		_suite(TestCommandScript, "command"),
+		_suite(TestVisualsScript, "visuals"),
 		_smoke(),
 	]
 
