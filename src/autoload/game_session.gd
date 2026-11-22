@@ -20,6 +20,7 @@ var rng: GameRNG = GameRNG.new(1)
 var ai_rng: GameRNG = GameRNG.new(1)
 
 var look_settings: LookSettings = LookSettings.new()
+var game_settings: GameSettings = GameSettings.new()
 
 var _command_inbox: Array[PlayerCommand] = []
 
@@ -37,6 +38,7 @@ func _ready() -> void:
 	process_physics_priority = 20
 	reset_profile(false)
 	look_settings.load_from_disk()
+	game_settings.load_from_disk()
 
 
 func reset_profile(emit_change: bool = true) -> void:
@@ -87,6 +89,7 @@ func start_run(dungeon_id: StringName, depth: int, seed_value: int = 0) -> Dunge
 	rng = GameRNG.new(run.seed_value)
 	ai_rng = GameRNG.new(_stream_seed(run.seed_value, AI_RNG_SALT))
 	_command_inbox.clear()
+	run.entry_inventory = profile.inventory.to_dict()
 	run_started.emit()
 	log_message.emit("Entered %s (depth %d)." % [def.display_name, run.depth], Color(0.85, 0.75, 0.45))
 	return run
@@ -110,7 +113,33 @@ func end_run(victory: bool) -> void:
 
 func record_kill(monster_id: StringName) -> void:
 	profile.progression.record_kill(monster_id)
+	if run != null:
+		run.kills_this_run += 1
 	profile_changed.emit()
+
+
+func apply_death_penalty() -> int:
+	if run == null:
+		return 0
+	var before := Inventory.from_dict(run.entry_inventory)
+	if before == null:
+		before = Inventory.new()
+	var lost := Inventory.count_new_instances(before, profile.inventory)
+	profile.inventory = before
+	profile.clamp_vitals()
+	profile_changed.emit()
+	return lost
+
+
+func restart_run() -> DungeonRunState:
+	if run == null:
+		return null
+	var dungeon_id := run.dungeon_id
+	var depth := run.depth
+	var seed_value := run.seed_value
+	run = null
+	_command_inbox.clear()
+	return start_run(dungeon_id, depth, seed_value)
 
 
 func give_loot(items: Array[ItemInstance]) -> void:

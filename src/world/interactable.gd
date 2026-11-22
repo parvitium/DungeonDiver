@@ -24,3 +24,20 @@ func try_use(by: Node) -> bool:
 		used = true
 	activated.emit(by)
 	return true
+
+
+func cover_visual(visual: Node3D, pad: Vector3 = Vector3(0.18, 0.2, 0.18)) -> void:
+	if visual == null:
+		return
+	var local := Greybox.visual_aabb(visual)
+	var aabb: AABB = visual.transform * local
+	var col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	if aabb.size.length() < 0.05:
+		box.size = Vector3(1.05, 0.9, 0.85)
+		col.position = Vector3(0, 0.4, 0)
+	else:
+		box.size = aabb.size + pad
+		col.position = aabb.get_center()
+	col.shape = box
+	add_child(col)

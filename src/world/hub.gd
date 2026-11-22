@@ -122,15 +122,16 @@ func _refresh_ui() -> void:
 		row.add_child(card)
 
 	var controls := HBoxContainer.new()
-	controls.add_theme_constant_override("separation", 8)
+	controls.name = "DepthRow"
+	controls.add_theme_constant_override("separation", 10)
+	controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(controls)
-	controls.add_child(ThemeFactory.label("Depth", 16))
 	for d in range(1, 4):
 		var btn := Button.new()
-		btn.text = str(d)
-		ThemeFactory.apply_button(btn)
-		if d == _depth:
-			btn.modulate = Color(1.2, 1.1, 0.7)
+		btn.text = "Depth %d" % d
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(140, 40)
+		ThemeFactory.apply_button(btn, d == _depth)
 		btn.pressed.connect(_set_depth.bind(d))
 		controls.add_child(btn)
 
@@ -177,18 +178,35 @@ func _select_or_enter(id: StringName) -> void:
 
 func _open_inv() -> void:
 	var panel := _ui.get_node("Inv")
-	panel.visible = not panel.visible
+	var best := _ui.get_node("Best")
 	if panel.visible:
+		_close_panel(panel)
+		return
+	_close_panel(best)
+	panel.visible = true
+	if panel.has_method("refresh"):
 		panel.refresh()
-		_ui.get_node("Best").visible = false
 
 
 func _open_bestiary() -> void:
 	var panel := _ui.get_node("Best")
-	panel.visible = not panel.visible
+	var inv := _ui.get_node("Inv")
 	if panel.visible:
+		_close_panel(panel)
+		return
+	_close_panel(inv)
+	panel.visible = true
+	if panel.has_method("refresh"):
 		panel.refresh()
-		_ui.get_node("Inv").visible = false
+
+
+func _close_panel(panel: Node) -> void:
+	if panel == null:
+		return
+	if panel.has_method("close"):
+		panel.close()
+	elif panel is CanvasItem:
+		(panel as CanvasItem).visible = false
 
 
 func _apply_load_result(ok: bool) -> void:
@@ -216,6 +234,12 @@ func _new_game() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_inventory"):
+		var panel := _ui.get_node_or_null("Inv")
+		if panel and panel.visible:
+			return
 		_open_inv()
 	elif event.is_action_pressed("toggle_bestiary"):
+		var panel := _ui.get_node_or_null("Best")
+		if panel and panel.visible:
+			return
 		_open_bestiary()

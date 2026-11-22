@@ -2,12 +2,12 @@
 
 First-person fantasy dungeon explorer. Fight monsters, take their gear, and keep going until every dungeon type and every monster type is in the book.
 
-This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Rooms are greybox primitives so Blender `.glb` meshes can replace them later. Co-op is designed for, not shipped — see [`docs/multiplayer-plan.md`](docs/multiplayer-plan.md).
+This repository is a **playable vertical-slice prototype** in **Godot 4.7**. Dungeon rooms use CC0 PBR stone and torch lighting; monsters use rigged CC0 GLBs. The hub / level-select screen is still the original greybox UI. Co-op is designed for, not shipped — see [`docs/multiplayer-plan.md`](docs/multiplayer-plan.md).
 
 ## Requirements
 
 - [Godot 4.7.x](https://godotengine.org/download/linux/) (4.7.2 used in CI)
-- No paid assets or services. Code is MIT; art/greybox is original / self-made CC0. See [`LICENSE`](LICENSE).
+- No paid assets or services. Code is MIT. Dungeon art is CC0 (Poly Haven, Quaternius props). Monster art is CC0 or CC-BY 3.0 as listed in [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md). Remaining greybox is original CC0. See [`LICENSE`](LICENSE).
 
 ## How to run
 
@@ -53,9 +53,20 @@ Hub: click a dungeon card to select it, click again to enter at the chosen depth
 - Bestiary and dungeon-conquered log, JSON save/load (`user://dungeondiver_save.json`)
 - Authoritative `GameSession`: local input becomes a `PlayerCommand` in the session inbox; the session applies it on its tick and owns a seeded `RandomNumberGenerator` for loot/combat rolls
 
-## Placeholder vs real content
+## Art
 
-Everything you see is a primitive: boxes, capsules, and colored lights. Sockets for future Blender exports are documented in [`assets/imported/README.md`](assets/imported/README.md). No Kenney / store packs are vendored.
+Dungeon walls, floors and ceilings are PBR-textured primitives (Poly Haven 1K).
+Rooms get wall torches with warm light and one shadow-casting spotlight, plus
+fog / SSAO. Corner props (crates, barrels, rubble, pillars) stay off the
+walk paths. Monsters use PBR models that match their names: an anatomical
+skeleton, a spectral skeleton wraith, a robed skeletal lich, a cave troll,
+and a wolf, with looping idle/walk/run. Hitboxes and combat numbers are
+unchanged.
+
+The main menu and level-select hub are intentionally the original greybox UI.
+
+Third-party files and licenses: [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).
+Sockets for further swaps: [`assets/imported/README.md`](assets/imported/README.md).
 
 ## Docs
 
@@ -70,4 +81,4 @@ Drop a `ItemDef` / `MonsterDef` / `DungeonTypeDef` / `LootTable` `.tres` into `d
 ## License
 
 - **Code** — MIT ([`LICENSE`](LICENSE))
-- **Assets** — original / self-made, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+- **Assets** — CC0 1.0 or CC-BY 3.0 as listed in [`assets/ASSET_LICENSES.md`](assets/ASSET_LICENSES.md).

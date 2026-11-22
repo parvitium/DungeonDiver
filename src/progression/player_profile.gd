@@ -12,6 +12,7 @@ var inventory: Inventory = Inventory.new()
 var progression: ProgressionState = ProgressionState.new()
 var current_health: float = BASE_HEALTH
 var current_stamina: float = BASE_STAMINA
+var gold: int = 40
 
 
 func base_stats() -> StatBlock:
@@ -62,6 +63,7 @@ func to_dict() -> Dictionary:
 		"progression": progression.to_dict(),
 		"current_health": current_health,
 		"current_stamina": current_stamina,
+		"gold": gold,
 	}
 
 
@@ -91,5 +93,8 @@ static func from_dict(data: Variant) -> PlayerProfile:
 	profile.progression = progression
 	profile.current_health = float(dict.get("current_health", BASE_HEALTH))
 	profile.current_stamina = float(dict.get("current_stamina", BASE_STAMINA))
+	if dict.has("gold") and not DD.is_number(dict["gold"]):
+		return null
+	profile.gold = maxi(0, int(dict.get("gold", 40)))
 	profile.clamp_vitals()
 	return profile

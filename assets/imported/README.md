@@ -1,11 +1,18 @@
-# Imported Blender assets
+# Imported 3D assets
 
-Drop exported `.glb` files here. Greybox nodes are tagged with `asset_socket` metadata:
+Runtime art lives in `res://assets/textures/` and `res://assets/models/`.
+Licenses and source URLs: [`ASSET_LICENSES.md`](../ASSET_LICENSES.md).
 
-- `floor`, `wall`, `ceiling` — dungeon pieces
-- `BodyVisual` — player/monster mesh
+Greybox nodes are still tagged with `asset_socket` metadata:
+
+- `floor`, `wall`, `ceiling` — dungeon pieces (now PBR-textured primitives)
+- `prop_pillar`, `prop_crate`, `prop_barrel`, `prop_rubble`
+- `BodyVisual` — monster GLB (player kit is still a first-person greybox)
 - `WeaponVisual`, `ShieldVisual` — first-person kit
 
-To swap a placeholder, instance the glb as a child of the matching node (or replace the MeshInstance3D) without changing simulation scripts.
+The hub / level-select scene is unchanged and still uses original greybox
+primitives. Dungeon rooms load CC0 PBR textures (Poly Haven) and CC0 / CC-BY
+GLBs (tevy skeleton, OpenGameArt wolf/troll, Quaternius props).
 
-Greybox art in this repo is original / self-made and released under CC0 1.0. Code is MIT. See the repository `LICENSE`.
+Original / self-made greybox helpers remain CC0 1.0. Code is MIT. See the
+repository `LICENSE`.
