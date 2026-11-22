@@ -4,12 +4,12 @@ extends RefCounted
 ## not on nodes or Input.
 
 enum Rarity { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY }
-enum EquipSlot { WEAPON, OFFHAND, HEAD, CHEST, LEGS, ACCESSORY }
+enum EquipSlot { WEAPON, OFFHAND, HEAD, CHEST, LEGS, ACCESSORY, RING, CONSUMABLE }
 enum AttackKind { MELEE, SPELL, MONSTER }
 enum RoomKind { START, COMBAT, TREASURE, BOSS }
 
 const RARITY_NAMES: PackedStringArray = ["Common", "Uncommon", "Rare", "Epic", "Legendary"]
-const SLOT_NAMES: PackedStringArray = ["Weapon", "Offhand", "Head", "Chest", "Legs", "Accessory"]
+const SLOT_NAMES: PackedStringArray = ["Weapon", "Offhand", "Head", "Chest", "Legs", "Accessory", "Ring"]
 
 const RARITY_MULT: PackedFloat32Array = [1.0, 1.15, 1.35, 1.6, 2.0]
 

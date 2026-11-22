@@ -8,6 +8,8 @@ var slot: DD.EquipSlot = DD.EquipSlot.WEAPON
 var rarity: DD.Rarity = DD.Rarity.COMMON
 var item_level: int = 1
 var stats: StatBlock = StatBlock.new()
+var is_consumable: bool = false
+var heal_amount: float = 0.0
 
 
 func full_name() -> String:
@@ -23,6 +25,8 @@ func to_dict() -> Dictionary:
 		"rarity": int(rarity),
 		"item_level": item_level,
 		"stats": stats.to_dict(),
+		"is_consumable": is_consumable,
+		"heal_amount": heal_amount,
 	}
 
 
@@ -48,8 +52,10 @@ static func from_dict(data: Variant) -> ItemInstance:
 	item.instance_id = str(dict.get("instance_id", DD.new_id("item")))
 	item.def_id = StringName(str(dict.get("def_id", "")))
 	item.display_name = str(dict.get("display_name", "Unknown Relic"))
-	item.slot = clampi(int(dict.get("slot", 0)), 0, Inventory.SLOT_COUNT - 1) as DD.EquipSlot
+	item.slot = clampi(int(dict.get("slot", 0)), 0, int(DD.EquipSlot.CONSUMABLE)) as DD.EquipSlot
 	item.rarity = clampi(int(dict.get("rarity", 0)), 0, 4) as DD.Rarity
 	item.item_level = maxi(1, int(dict.get("item_level", 1)))
 	item.stats = stats
+	item.is_consumable = bool(dict.get("is_consumable", false))
+	item.heal_amount = float(dict.get("heal_amount", 0.0))
 	return item

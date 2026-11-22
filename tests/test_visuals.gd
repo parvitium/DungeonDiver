@@ -94,6 +94,8 @@ static func run() -> DDTest:
 	var hub_script := FileAccess.get_file_as_string("res://src/world/hub.gd")
 	t.assert_true(hub_script.contains("DungeonDiver"), "hub title copy intact")
 	t.assert_true(hub_script.contains("Enter at depth"), "hub enter copy intact")
+	t.assert_true(hub_script.contains("Depth %d"), "labelled equal-width depth buttons")
+	t.assert_true(hub_script.contains("DepthRow"), "depth row named")
 
 	world.free()
 	return t

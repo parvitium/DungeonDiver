@@ -53,6 +53,7 @@ static func all_items() -> Array[ItemDef]:
 	items.append(_item(&"ember_charm", "Ember Charm", "A coal that never quite dies.", DD.EquipSlot.ACCESSORY, {
 		"spell_power": 8.0, "attack": 2.0
 	}))
+	items.append(_potion(&"health_flask", "Health Flask", "A warm draught that knits flesh.", 40.0))
 	return items
 
 
@@ -130,11 +131,11 @@ static func all_dungeons() -> Array[DungeonTypeDef]:
 
 static func all_loot_tables() -> Array[LootTable]:
 	var tables: Array[LootTable] = []
-	tables.append(_table(&"crypt_drops", ["rusty_sword", "bone_club", "leather_cap", "tattered_vest", "crypt_coin", "crypt_lantern", "greaves_of_the_crypt", "iron_helm"], [16, 14, 12, 12, 10, 10, 8, 8], 1, 1))
-	tables.append(_table(&"cavern_drops", ["fang_dagger", "hide_buckler", "wolfhide_coat", "traveler_boots", "wolf_tooth", "ember_staff", "leather_cap"], [16, 14, 14, 12, 12, 10, 8], 1, 1))
-	tables.append(_table(&"mixed_drops", ["ember_staff", "ember_charm", "crypt_lantern", "wolf_tooth", "traveler_boots"], [22, 20, 20, 20, 18], 1, 1))
+	tables.append(_table(&"crypt_drops", ["rusty_sword", "bone_club", "leather_cap", "tattered_vest", "crypt_coin", "crypt_lantern", "greaves_of_the_crypt", "iron_helm", "health_flask"], [16, 14, 12, 12, 10, 10, 8, 8, 12], 1, 1))
+	tables.append(_table(&"cavern_drops", ["fang_dagger", "hide_buckler", "wolfhide_coat", "traveler_boots", "wolf_tooth", "ember_staff", "leather_cap", "health_flask"], [16, 14, 14, 12, 12, 10, 8, 12], 1, 1))
+	tables.append(_table(&"mixed_drops", ["ember_staff", "ember_charm", "crypt_lantern", "wolf_tooth", "traveler_boots", "health_flask"], [22, 20, 20, 20, 18, 16], 1, 1))
 	tables.append(_table(&"boss_drops", ["bone_mail", "iron_helm", "ember_charm", "ember_staff", "wolfhide_coat", "greaves_of_the_crypt"], [18, 16, 18, 16, 16, 16], 2, 3))
-	tables.append(_table(&"chest_drops", ["rusty_sword", "tattered_vest", "traveler_boots", "leather_cap", "hide_buckler", "crypt_coin", "wolf_tooth"], [14, 14, 14, 14, 14, 15, 15], 1, 2))
+	tables.append(_table(&"chest_drops", ["rusty_sword", "tattered_vest", "traveler_boots", "leather_cap", "hide_buckler", "crypt_coin", "wolf_tooth", "health_flask"], [14, 14, 14, 14, 14, 12, 12, 16], 1, 2))
 	return tables
 
 
@@ -145,6 +146,19 @@ static func _item(id: StringName, name: String, desc: String, slot: DD.EquipSlot
 	def.description = desc
 	def.slot = slot
 	def.base_stats = stats
+	return def
+
+
+static func _potion(id: StringName, name: String, desc: String, heal: float) -> ItemDef:
+	var def := ItemDef.new()
+	def.id = id
+	def.display_name = name
+	def.description = desc
+	def.slot = DD.EquipSlot.CONSUMABLE
+	def.is_consumable = true
+	def.heal_amount = heal
+	def.min_rarity = DD.Rarity.COMMON
+	def.max_rarity = DD.Rarity.COMMON
 	return def
 
 

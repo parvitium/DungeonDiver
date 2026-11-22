@@ -250,4 +250,7 @@ static func _restore() -> void:
 	session.ui_open = false
 	session.look_settings.sensitivity = LookSettings.DEFAULT_SENSITIVITY
 	session.look_settings.invert_y = false
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree:
+		tree.paused = false
 	MouseCapture.apply(MouseCapture.Context.HUB)

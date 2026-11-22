@@ -2,6 +2,28 @@ class_name DungeonBuilder
 extends RefCounted
 
 
+static func exit_placement(origin: Vector3, room: RoomSpec) -> Dictionary:
+	var half := DD.ROOM_SIZE * 0.5
+	var inset := 0.42
+	if not bool(room.doors.get("s", false)):
+		return {"position": origin + Vector3(0, 0, half - inset), "inward": Vector3(0, 0, -1)}
+	if not bool(room.doors.get("n", false)):
+		return {"position": origin + Vector3(0, 0, -(half - inset)), "inward": Vector3(0, 0, 1)}
+	if not bool(room.doors.get("e", false)):
+		return {"position": origin + Vector3(half - inset, 0, 0), "inward": Vector3(-1, 0, 0)}
+	return {"position": origin + Vector3(-(half - inset), 0, 0), "inward": Vector3(1, 0, 0)}
+
+
+static func monster_spawn_offsets(count: int) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	var n := maxi(count, 1)
+	for i in count:
+		var ang := TAU * float(i) / float(n) + 0.42
+		var radius := 3.35 if count == 1 else 3.15 + 0.4 * float(i % 2)
+		out.append(Vector3(cos(ang) * radius, 0.0, sin(ang) * radius))
+	return out
+
+
 func build(parent: Node3D, blueprint: DungeonBlueprint, def: DungeonTypeDef, bake_nav: bool = true) -> Dictionary:
 	var markers := {
 		"spawns": [],
@@ -16,9 +38,10 @@ func build(parent: Node3D, blueprint: DungeonBlueprint, def: DungeonTypeDef, bak
 	nav.name = "Navigation"
 	parent.add_child(nav)
 	var nav_mesh := NavigationMesh.new()
-	nav_mesh.agent_radius = 0.4
+	nav_mesh.agent_radius = 0.5
 	nav_mesh.agent_height = 1.7
 	nav_mesh.agent_max_climb = 0.4
+	nav_mesh.agent_max_slope = 45.0
 	nav_mesh.cell_size = 0.25
 	nav_mesh.cell_height = 0.25
 	nav.navigation_mesh = nav_mesh
@@ -101,9 +124,9 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, def: D
 		parent.add_child(plinth)
 		reserved.append(plinth.position)
 	else:
-		var offsets := [Vector3(3, 0, 2), Vector3(-3, 0, -2), Vector3(2.5, 0, -3)]
+		var offsets := monster_spawn_offsets(room.monster_ids.size())
 		for i in room.monster_ids.size():
-			var spawn_at: Vector3 = origin + offsets[i % offsets.size()] + Vector3(0, 0.05, 0)
+			var spawn_at: Vector3 = origin + offsets[i] + Vector3(0, 0.05, 0)
 			markers["spawns"].append({
 				"id": room.monster_ids[i],
 				"position": spawn_at,
@@ -116,8 +139,9 @@ func _build_room(nav: NavigationRegion3D, parent: Node3D, room: RoomSpec, def: D
 		reserved.append(chest_at)
 
 	if room.has_exit:
-		markers["exit"] = origin + Vector3(0, 0.1, 3.6)
-		reserved.append(markers["exit"])
+		var exit_mark := exit_placement(origin, room)
+		markers["exit"] = exit_mark
+		reserved.append(exit_mark["position"])
 
 	_place_torches(parent, origin, room, def)
 	DungeonProps.dress_room(nav, parent, room, def, reserved)

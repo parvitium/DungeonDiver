@@ -5,6 +5,7 @@ var _player: Player
 var _hud: CanvasLayer
 var _exit: Interactable
 var _alive_monsters: int = 0
+var _death: CanvasLayer
 
 
 func _ready() -> void:
@@ -13,6 +14,8 @@ func _ready() -> void:
 	var def: DungeonTypeDef = ContentDB.get_dungeon(GameSession.run.dungeon_id)
 	var builder := DungeonBuilder.new()
 	var markers: Dictionary = builder.build(self, GameSession.run.blueprint, def)
+	var vfx := CombatVfx.new()
+	add_child(vfx)
 	_spawn_player(markers["player"])
 	_spawn_monsters(markers["spawns"])
 	_spawn_chests(markers["chests"])
@@ -20,9 +23,12 @@ func _ready() -> void:
 	_hud = preload("res://src/ui/hud.gd").new()
 	add_child(_hud)
 	_hud.bind_player(_player)
+	_death = preload("res://src/ui/death_overlay.gd").new()
+	add_child(_death)
+	_death.retry_pressed.connect(_on_retry)
+	_death.menu_pressed.connect(_on_main_menu)
 	GameSession.ui_open = false
 	MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
-	# Windows can drop capture if the window is not focused yet during _ready.
 	call_deferred("_ensure_capture")
 
 
@@ -57,17 +63,8 @@ func _spawn_monsters(spawns: Array) -> void:
 
 func _spawn_chests(positions: Array) -> void:
 	for pos in positions:
-		var chest := Interactable.new()
-		chest.prompt = "Open chest"
-		chest.consume_on_use = true
-		var visual := DungeonProps.make_chest_visual()
-		visual.position = Vector3(0, 0.0, 0)
-		chest.add_child(visual)
-		var shape := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(1.1, 1.0, 0.9)
-		shape.shape = box
-		chest.add_child(shape)
+		var chest := LootChest.new()
+		chest.chest_key = LootChest.key_for(pos)
 		add_child(chest)
 		chest.global_position = pos
 		chest.activated.connect(_on_chest_opened.bind(chest))
@@ -76,34 +73,23 @@ func _spawn_chests(positions: Array) -> void:
 func _spawn_exit(at: Variant) -> void:
 	if at == null:
 		return
-	_exit = Interactable.new()
-	_exit.prompt = "Leave through the gate"
-	_exit.locked = true
-	var dungeon_def: DungeonTypeDef = ContentDB.get_dungeon(GameSession.run.dungeon_id) if GameSession.run else Catalog.all_dungeons()[0]
-	var frame := Greybox.make_box_with_material(Vector3(2.0, 2.7, 0.42), DungeonMaterials.wall_mat(dungeon_def), false)
-	frame.position = Vector3(0, 1.35, 0)
-	_exit.add_child(frame)
-	var visual := MeshInstance3D.new()
-	var portal := BoxMesh.new()
-	portal.size = Vector3(1.15, 2.15, 0.08)
-	visual.mesh = portal
-	visual.material_override = DungeonMaterials.portal_mat(Color(0.35, 0.85, 0.7))
-	visual.position = Vector3(0, 1.25, 0)
-	_exit.add_child(visual)
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(1.8, 2.6, 0.8)
-	shape.shape = box
-	_exit.add_child(shape)
-	var light := OmniLight3D.new()
-	light.light_color = Color(0.4, 1.0, 0.8)
-	light.light_energy = 2.2
-	light.omni_range = 5.0
-	light.position = Vector3(0, 1.6, 0)
-	_exit.add_child(light)
-	add_child(_exit)
-	_exit.global_position = at
-	_exit.activated.connect(_on_exit_used)
+	var pos := Vector3.ZERO
+	var inward := Vector3(0, 0, -1)
+	if at is Dictionary:
+		pos = at.get("position", Vector3.ZERO)
+		inward = at.get("inward", inward)
+	elif at is Vector3:
+		pos = at
+	var gate := ExitGate.new()
+	add_child(gate)
+	gate.global_position = pos
+	if inward.length() > 0.01:
+		gate.look_at(pos + inward, Vector3.UP)
+	gate.set_locked_state(true)
+	gate.activated.connect(_on_exit_used)
+	_exit = gate
+	if GameSession.run and GameSession.run.boss_defeated:
+		gate.set_locked_state(false)
 
 
 func _on_monster_died(monster: Monster) -> void:
@@ -120,7 +106,10 @@ func _on_monster_died(monster: Monster) -> void:
 	if monster.def.is_boss:
 		GameSession.run.boss_defeated = true
 		if _exit:
-			_exit.locked = false
+			if _exit.has_method("set_locked_state"):
+				_exit.set_locked_state(false)
+			else:
+				_exit.locked = false
 			GameSession.log_message.emit("The gate unlocks.", Color(0.55, 1.0, 0.8))
 
 
@@ -136,8 +125,6 @@ func _on_chest_opened(_by: Node, chest: Interactable) -> void:
 		add_child(drop)
 		drop.setup(loot[i])
 		drop.global_position = chest.global_position + Vector3(0.4 * float(i), 0.3, 0.4)
-	if is_instance_valid(chest):
-		chest.queue_free()
 
 
 func _on_exit_used(_by: Node) -> void:
@@ -147,6 +134,27 @@ func _on_exit_used(_by: Node) -> void:
 
 func _on_player_died() -> void:
 	GameSession.log_message.emit("You fall in the dark.", Color(1.0, 0.3, 0.25))
-	await get_tree().create_timer(1.4).timeout
+	var dungeon_name := "the dungeon"
+	var depth := 1
+	var kills := 0
+	if GameSession.run:
+		var def: DungeonTypeDef = ContentDB.get_dungeon(GameSession.run.dungeon_id)
+		if def:
+			dungeon_name = def.display_name
+		depth = GameSession.run.depth
+		kills = GameSession.run.kills_this_run
+	var lost := GameSession.apply_death_penalty()
+	if _hud and _hud.has_method("close_panels"):
+		_hud.close_panels()
+	if _death:
+		_death.present({"dungeon": dungeon_name, "depth": depth, "kills": kills, "lost": lost})
+
+
+func _on_retry() -> void:
+	GameSession.restart_run()
+	get_tree().change_scene_to_file("res://scenes/dungeon_run.tscn")
+
+
+func _on_main_menu() -> void:
 	GameSession.end_run(false)
 	get_tree().change_scene_to_file("res://scenes/hub.tscn")

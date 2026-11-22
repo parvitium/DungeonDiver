@@ -179,7 +179,7 @@ static func _clamp_enums(t: DDTest) -> void:
 	t.assert_eq(session.profile.inventory.items.size(), 1, "clamped item kept")
 	if session.profile.inventory.items.size() == 1:
 		var item: ItemInstance = session.profile.inventory.items[0]
-		t.assert_in_range(float(item.slot), 0.0, 5.0, "slot clamped")
+		t.assert_in_range(float(item.slot), 0.0, float(DD.EquipSlot.CONSUMABLE), "slot clamped")
 		t.assert_in_range(float(item.rarity), 0.0, 4.0, "rarity clamped")
 	session.reset_profile(false)
 

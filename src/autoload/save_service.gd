@@ -3,6 +3,10 @@ extends Node
 var last_quarantine_path: String = ""
 
 
+func save_active() -> bool:
+	return save_game()
+
+
 func save_game(path: String = DD.SAVE_PATH) -> bool:
 	var payload := SaveCodec.payload_from_profile(GameSession.profile)
 	payload["saved_unix"] = int(Time.get_unix_time_from_system())
