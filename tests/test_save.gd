@@ -38,6 +38,10 @@ static func _happy_path(t: DDTest) -> void:
 	t.assert_eq(loaded.progression.kills_of(&"wraith"), 1, "bestiary restored")
 	t.assert_eq(loaded.progression.highest_clear(&"cavern"), 2, "dungeon log restored")
 	t.assert_eq(loaded.inventory.equipped_stats().attack, 8.0, "gear restored")
+	profile.gold = 123
+	payload = SaveCodec.payload_from_profile(profile)
+	loaded = SaveCodec.profile_from_payload(payload)
+	t.assert_eq(loaded.gold, 123, "gold restored")
 	t.assert_eq(loaded.inventory.equipped[DD.EquipSlot.WEAPON].rarity, DD.Rarity.RARE, "rarity restored")
 	var minimal := SaveCodec.decode_payload({"version": DD.SAVE_VERSION, "profile": {}})
 	t.assert_true(minimal != null, "missing fields default")

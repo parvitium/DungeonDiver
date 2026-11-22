@@ -84,7 +84,10 @@ func _spawn_exit(at: Variant) -> void:
 	add_child(gate)
 	gate.global_position = pos
 	if inward.length() > 0.01:
-		gate.look_at(pos + inward, Vector3.UP)
+		var look := pos + inward
+		look.y = pos.y
+		if look.distance_to(pos) > 0.05:
+			gate.look_at(look, Vector3.UP)
 	gate.set_locked_state(true)
 	gate.activated.connect(_on_exit_used)
 	_exit = gate
@@ -129,7 +132,7 @@ func _on_chest_opened(_by: Node, chest: Interactable) -> void:
 
 func _on_exit_used(_by: Node) -> void:
 	GameSession.end_run(true)
-	get_tree().change_scene_to_file("res://scenes/hub.tscn")
+	GameSession.go_to_town()
 
 
 func _on_player_died() -> void:
@@ -156,5 +159,4 @@ func _on_retry() -> void:
 
 
 func _on_main_menu() -> void:
-	GameSession.end_run(false)
-	get_tree().change_scene_to_file("res://scenes/hub.tscn")
+	GameSession.go_to_main_menu()

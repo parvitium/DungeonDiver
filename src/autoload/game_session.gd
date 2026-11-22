@@ -95,6 +95,28 @@ func start_run(dungeon_id: StringName, depth: int, seed_value: int = 0) -> Dunge
 	return run
 
 
+func go_to_town() -> void:
+	ui_open = true
+	MouseCapture.apply(MouseCapture.Context.HUB)
+	if is_inside_tree():
+		var tree := get_tree()
+		if tree:
+			tree.paused = false
+			tree.change_scene_to_file("res://scenes/hub.tscn")
+
+
+func go_to_main_menu() -> void:
+	if run != null:
+		end_run(false)
+	ui_open = true
+	MouseCapture.apply(MouseCapture.Context.HUB)
+	if is_inside_tree():
+		var tree := get_tree()
+		if tree:
+			tree.paused = false
+			tree.change_scene_to_file("res://scenes/main_menu.tscn")
+
+
 func end_run(victory: bool) -> void:
 	if run == null:
 		return
@@ -108,7 +130,7 @@ func end_run(victory: bool) -> void:
 	profile.refill()
 	profile_changed.emit()
 	run_ended.emit(victory)
-	SaveService.save_game()
+	SaveService.save_active()
 
 
 func record_kill(monster_id: StringName) -> void:
@@ -140,6 +162,19 @@ func restart_run() -> DungeonRunState:
 	run = null
 	_command_inbox.clear()
 	return start_run(dungeon_id, depth, seed_value)
+
+
+func use_item(instance_id: String) -> bool:
+	if not profile.inventory.use_consumable(instance_id, profile):
+		return false
+	var pawn := _find_player()
+	if pawn:
+		pawn.set("health", profile.current_health)
+		if pawn.has_signal("vitals_changed"):
+			pawn.vitals_changed.emit()
+	profile_changed.emit()
+	SaveService.save_active()
+	return true
 
 
 func give_loot(items: Array[ItemInstance]) -> void:

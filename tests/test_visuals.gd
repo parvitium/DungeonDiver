@@ -90,15 +90,48 @@ static func run() -> DDTest:
 	_assert_locomotion_loops(t, mob)
 	mob.free()
 
-	# Hub construction must still work; this pass does not restyle the menu.
 	var hub_script := FileAccess.get_file_as_string("res://src/world/hub.gd")
-	t.assert_true(hub_script.contains("DungeonDiver"), "hub title copy intact")
+	t.assert_true(hub_script.contains("Town"), "town title copy intact")
 	t.assert_true(hub_script.contains("Enter at depth"), "hub enter copy intact")
+	t.assert_true(hub_script.contains("Floor depth"), "depth heading")
 	t.assert_true(hub_script.contains("Depth %d"), "labelled equal-width depth buttons")
-	t.assert_true(hub_script.contains("DepthRow"), "depth row named")
+	t.assert_false(hub_script.contains("btn.text = str(d)"), "no bare 1/2/3 depth buttons")
+	_assert_hub_layout(t, tree)
 
 	world.free()
 	return t
+
+
+static func _assert_hub_layout(t: DDTest, tree: SceneTree) -> void:
+	if tree == null or tree.root == null:
+		t.assert_true(false, "scene tree for hub layout")
+		return
+	var hub: Node = (load("res://src/world/hub.gd") as GDScript).new()
+	tree.root.add_child(hub)
+	if hub.get_child_count() == 0 and hub.has_method("_ready"):
+		hub._ready()
+	var row := hub.find_child("DepthRow", true, false) as HBoxContainer
+	t.assert_true(row != null, "depth row exists")
+	if row:
+		t.assert_eq(row.get_child_count(), 3, "three depth buttons")
+		t.assert_eq(row.get_theme_constant("separation"), 12, "depth button spacing")
+		for i in 3:
+			var btn := row.get_child(i) as Button
+			t.assert_true(btn != null, "depth %d is a button" % (i + 1))
+			if btn == null:
+				continue
+			t.assert_eq(btn.text, "Depth %d" % (i + 1), "depth %d label" % (i + 1))
+			t.assert_ge(btn.custom_minimum_size.x, 140.0, "depth %d min width" % (i + 1))
+			t.assert_ge(btn.custom_minimum_size.y, 36.0, "depth %d min height" % (i + 1))
+			t.assert_true(btn.size_flags_horizontal & Control.SIZE_EXPAND, "depth %d equal stretch" % (i + 1))
+	var heading := hub.find_child("DepthSection", true, false)
+	t.assert_true(heading != null, "depth section")
+	if heading:
+		var title := heading.get_child(0) as Label
+		t.assert_true(title != null and title.text == "Floor depth", "floor depth heading")
+		if title:
+			t.assert_eq(title.autowrap_mode, TextServer.AUTOWRAP_OFF, "heading does not letter-wrap")
+	hub.free()
 
 
 static func _assert_locomotion_loops(t: DDTest, mob: Node) -> void:

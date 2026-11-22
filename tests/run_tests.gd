@@ -14,6 +14,7 @@ const TestCommandScript := preload("res://tests/test_command.gd")
 const TestMouseLookScript := preload("res://tests/test_mouse_look.gd")
 const TestVisualsScript := preload("res://tests/test_visuals.gd")
 const TestGameplayScript := preload("res://tests/test_gameplay.gd")
+const TestTownScript := preload("res://tests/test_town.gd")
 
 
 func _initialize() -> void:
@@ -62,6 +63,7 @@ func _run() -> int:
 	suites.append(await _suite(TestMouseLookScript, "mouse_look"))
 	suites.append(await _suite(TestVisualsScript, "visuals"))
 	suites.append(await _suite(TestGameplayScript, "gameplay"))
+	suites.append(await _suite(TestTownScript, "town"))
 	suites.append(_smoke())
 	suites.append(_smoke_all_dungeons())
 

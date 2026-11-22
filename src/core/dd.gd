@@ -9,15 +9,18 @@ enum AttackKind { MELEE, SPELL, MONSTER }
 enum RoomKind { START, COMBAT, TREASURE, BOSS }
 
 const RARITY_NAMES: PackedStringArray = ["Common", "Uncommon", "Rare", "Epic", "Legendary"]
-const SLOT_NAMES: PackedStringArray = ["Weapon", "Offhand", "Head", "Chest", "Legs", "Accessory", "Ring"]
+const SLOT_NAMES: PackedStringArray = ["Weapon", "Offhand", "Head", "Chest", "Legs", "Accessory", "Ring", "Consumable"]
 
 const RARITY_MULT: PackedFloat32Array = [1.0, 1.15, 1.35, 1.6, 2.0]
 
 ## Weight of each rarity at dungeon effective-tier 1. Higher tiers shift right.
 const BASE_RARITY_WEIGHTS: PackedFloat32Array = [55.0, 28.0, 12.0, 4.0, 1.0]
 
-const SAVE_PATH := "user://dungeondiver_save.json"
+const SAVE_PATH := "user://dungeondiver_slot_1.json"
+const LEGACY_SAVE_PATH := "user://dungeondiver_save.json"
+const SAVE_SLOT_COUNT := 3
 const SAVE_VERSION := 1
+const STARTING_GOLD := 40
 
 const WORLD_LAYER := 1
 const PLAYER_LAYER := 2
