@@ -12,6 +12,10 @@ var inventory: Inventory = Inventory.new()
 var progression: ProgressionState = ProgressionState.new()
 var current_health: float = BASE_HEALTH
 var current_stamina: float = BASE_STAMINA
+var gold: int = DD.STARTING_GOLD
+var shop_stock: Array = []
+var shop_buyback: Array = []
+var shop_depth: int = -1
 
 
 func base_stats() -> StatBlock:
@@ -52,6 +56,7 @@ func grant_starter_kit(item_defs: Dictionary, rng: GameRNG) -> void:
 		vest.stats = item_defs["tattered_vest"].stats().scaled(1.0)
 		inventory.add_item(vest)
 		inventory.equip(vest.instance_id)
+	gold = DD.STARTING_GOLD
 	refill()
 
 
@@ -62,7 +67,19 @@ func to_dict() -> Dictionary:
 		"progression": progression.to_dict(),
 		"current_health": current_health,
 		"current_stamina": current_stamina,
+		"gold": gold,
+		"shop_stock": _items_to_dicts(shop_stock),
+		"shop_buyback": _items_to_dicts(shop_buyback),
+		"shop_depth": shop_depth,
 	}
+
+
+static func _items_to_dicts(items: Array) -> Array:
+	var out: Array = []
+	for entry in items:
+		if entry is ItemInstance:
+			out.append(entry.to_dict())
+	return out
 
 
 static func from_dict(data: Variant) -> PlayerProfile:
@@ -79,6 +96,8 @@ static func from_dict(data: Variant) -> PlayerProfile:
 		return null
 	if dict.has("progression") and not dict["progression"] is Dictionary:
 		return null
+	if dict.has("gold") and not DD.is_number(dict["gold"]):
+		return null
 	var inventory := Inventory.from_dict(dict.get("inventory", {}))
 	if inventory == null:
 		return null
@@ -91,5 +110,20 @@ static func from_dict(data: Variant) -> PlayerProfile:
 	profile.progression = progression
 	profile.current_health = float(dict.get("current_health", BASE_HEALTH))
 	profile.current_stamina = float(dict.get("current_stamina", BASE_STAMINA))
+	profile.gold = maxi(0, int(dict.get("gold", DD.STARTING_GOLD)))
+	profile.shop_stock = _items_from_dicts(dict.get("shop_stock", []))
+	profile.shop_buyback = _items_from_dicts(dict.get("shop_buyback", []))
+	profile.shop_depth = int(dict.get("shop_depth", -1))
 	profile.clamp_vitals()
 	return profile
+
+
+static func _items_from_dicts(data: Variant) -> Array:
+	var out: Array = []
+	if not data is Array:
+		return out
+	for entry in data:
+		var item := ItemInstance.from_dict(entry)
+		if item:
+			out.append(item)
+	return out

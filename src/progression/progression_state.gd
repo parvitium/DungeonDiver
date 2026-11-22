@@ -44,6 +44,13 @@ func dungeon_conquered(dungeon_id: StringName) -> bool:
 	return highest_clear(dungeon_id) > 0
 
 
+func best_depth() -> int:
+	var best := 0
+	for key in conquered:
+		best = maxi(best, int(conquered[key]))
+	return best
+
+
 func discovered_count(known_monster_ids: PackedStringArray) -> int:
 	var count := 0
 	for monster_id in known_monster_ids:
