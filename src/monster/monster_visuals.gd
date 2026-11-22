@@ -28,6 +28,9 @@ const CONFIG := {
 		"run": "Run",
 		"attack": "Attack",
 		"death": "Death",
+		"capsule_radius": 0.42,
+		"capsule_height": 0.95,
+		"eye_y": 0.55,
 	},
 	"wraith": {
 		"scene": "res://assets/models/monsters/pbr_skeleton.glb",
@@ -63,8 +66,23 @@ const CONFIG := {
 		"run": "Run",
 		"attack": "Attack",
 		"death": "Death",
+		"capsule_radius": 0.55,
+		"capsule_height": 2.05,
+		"eye_y": 1.45,
 	},
 }
+
+
+static func capsule_radius_of(cfg: Dictionary) -> float:
+	return float(cfg.get("capsule_radius", CAPSULE_RADIUS))
+
+
+static func capsule_height_of(cfg: Dictionary) -> float:
+	return float(cfg.get("capsule_height", CAPSULE_HEIGHT))
+
+
+static func eye_y_of(cfg: Dictionary) -> float:
+	return float(cfg.get("eye_y", CAPSULE_HEIGHT * 0.65))
 
 
 static func config_for(id: StringName) -> Dictionary:
@@ -90,6 +108,7 @@ static func attach(host: Node3D, def: MonsterDef) -> Dictionary:
 				_strip_collision(model)
 				host.add_child(model)
 				info["anim"] = _find_anim(model)
+				_disable_root_motion(info["anim"])
 				_hide_named(model, cfg.get("hide", []))
 				_stylize(model, String(cfg.get("style", "")))
 				Greybox.fit_height(model, float(cfg.get("height", 1.65)))
@@ -156,6 +175,12 @@ static func resolve_clip(anim: AnimationPlayer, cfg: Dictionary, kind: String) -
 			if low.contains(key) and not low.contains("pose") and not low.contains("resurrect"):
 				return n
 	return ""
+
+
+static func _disable_root_motion(anim: AnimationPlayer) -> void:
+	if anim == null:
+		return
+	anim.root_motion_track = NodePath()
 
 
 static func _hide_named(root: Node, names) -> void:

@@ -8,6 +8,8 @@ extends Resource
 @export var base_stats: Dictionary = {}
 @export var min_rarity: DD.Rarity = DD.Rarity.COMMON
 @export var max_rarity: DD.Rarity = DD.Rarity.LEGENDARY
+@export var is_consumable: bool = false
+@export var heal_amount: float = 0.0
 
 
 func stats() -> StatBlock:
@@ -21,7 +23,7 @@ static func is_valid_extra(resource: Variant) -> bool:
 	var def: ItemDef = resource
 	if String(def.id).is_empty() or def.display_name.is_empty():
 		return false
-	if int(def.slot) < 0 or int(def.slot) >= Inventory.SLOT_COUNT:
+	if int(def.slot) < 0 or int(def.slot) > int(DD.EquipSlot.CONSUMABLE):
 		return false
 	if int(def.min_rarity) < 0 or int(def.max_rarity) > 4:
 		return false

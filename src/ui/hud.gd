@@ -211,14 +211,36 @@ func _process(delta: float) -> void:
 	if _hp_trail and _hp_bar:
 		_trail_value = move_toward(_trail_value, _hp_bar.value, delta * 42.0)
 		_hp_trail.value = _trail_value
+	_sync_closed_panels()
+
+
+func _sync_closed_panels() -> void:
+	if _death_showing():
+		return
+	if _inv_panel and _inv_panel.visible:
+		return
+	if _bestiary_panel and _bestiary_panel.visible:
+		return
+	if _pause_panel and _pause_panel.visible:
+		return
+	if _settings_panel and _settings_panel.visible:
+		return
+	if GameSession.ui_open:
+		_restore_capture()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_inventory"):
-		_toggle(_inv_panel)
+		if _inv_panel and _inv_panel.visible:
+			_close_all()
+		else:
+			_toggle(_inv_panel)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("toggle_bestiary"):
-		_toggle(_bestiary_panel)
+		if _bestiary_panel and _bestiary_panel.visible:
+			_close_all()
+		else:
+			_toggle(_bestiary_panel)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("pause_menu") or event.is_action_pressed("ui_cancel"):
 		if _inv_panel.visible or _bestiary_panel.visible or (_settings_panel and _settings_panel.visible):

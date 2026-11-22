@@ -29,7 +29,6 @@ func _ready() -> void:
 	_death.menu_pressed.connect(_on_main_menu)
 	GameSession.ui_open = false
 	MouseCapture.apply(MouseCapture.Context.DUNGEON_PLAY)
-	# Windows can drop capture if the window is not focused yet during _ready.
 	call_deferred("_ensure_capture")
 
 
@@ -79,21 +78,21 @@ func _spawn_exit(at: Variant) -> void:
 	if at is Dictionary:
 		pos = at.get("position", Vector3.ZERO)
 		inward = at.get("inward", inward)
-	else:
+	elif at is Vector3:
 		pos = at
 	var gate := ExitGate.new()
-	gate.locked = true
 	add_child(gate)
 	gate.global_position = pos
-	var look := pos + inward
-	look.y = pos.y
-	if look.distance_to(pos) > 0.05:
-		gate.look_at(look, Vector3.UP)
+	if inward.length() > 0.01:
+		var look := pos + inward
+		look.y = pos.y
+		if look.distance_to(pos) > 0.05:
+			gate.look_at(look, Vector3.UP)
 	gate.set_locked_state(true)
+	gate.activated.connect(_on_exit_used)
+	_exit = gate
 	if GameSession.run and GameSession.run.boss_defeated:
 		gate.set_locked_state(false)
-	_exit = gate
-	_exit.activated.connect(_on_exit_used)
 
 
 func _on_monster_died(monster: Monster) -> void:
@@ -147,10 +146,11 @@ func _on_player_died() -> void:
 			dungeon_name = def.display_name
 		depth = GameSession.run.depth
 		kills = GameSession.run.kills_this_run
+	var lost := GameSession.apply_death_penalty()
 	if _hud and _hud.has_method("close_panels"):
 		_hud.close_panels()
 	if _death:
-		_death.present({"dungeon": dungeon_name, "depth": depth, "kills": kills})
+		_death.present({"dungeon": dungeon_name, "depth": depth, "kills": kills, "lost": lost})
 
 
 func _on_retry() -> void:

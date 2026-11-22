@@ -49,16 +49,31 @@ func _ready() -> void:
 	var melee_cmd := PlayerCommand.new()
 	melee_cmd.melee = true
 	player.apply_command(melee_cmd, 0.016)
-	failed += _check(mob.health < hp_before, "melee shapecast hits")
+	for _i in 16:
+		player.apply_command(PlayerCommand.new(), 0.016)
+	failed += _check(mob.health < hp_before, "melee cone hits in range")
 
 	var hub: Node = load("res://scenes/hub.tscn").instantiate()
 	add_child(hub)
 	failed += _check(hub.get_child_count() > 3, "hub constructs world+ui")
 
+	for dungeon_id in ContentDB.dungeon_ids():
+		GameSession.start_run(dungeon_id, 1, 7)
+		failed += _check(GameSession.run != null, "start %s" % String(dungeon_id))
+		failed += _check(GameSession.run.blueprint.layout_is_connected(), "%s connected" % String(dungeon_id))
+		failed += _check(GameSession.run.blueprint.has_boss_and_exit(), "%s boss+exit" % String(dungeon_id))
+		var def_run: DungeonTypeDef = ContentDB.get_dungeon(dungeon_id)
+		var built := Node3D.new()
+		add_child(built)
+		DungeonBuilder.new().build(built, GameSession.run.blueprint, def_run, false)
+		failed += _check(built.get_child_count() > 3, "%s geometry" % String(dungeon_id))
+		built.queue_free()
+		GameSession.end_run(false)
+
 	GameSession.start_run(&"cavern", 2, 7)
-	failed += _check(GameSession.run != null, "start cavern run")
-	failed += _check(GameSession.run.blueprint.layout_is_connected(), "cavern connected")
-	failed += _check(GameSession.run.blueprint.has_boss_and_exit(), "cavern boss+exit")
+	failed += _check(GameSession.run != null, "start cavern run depth 2")
+	failed += _check(GameSession.run.blueprint.layout_is_connected(), "cavern depth 2 connected")
+	failed += _check(GameSession.run.blueprint.has_boss_and_exit(), "cavern depth 2 boss+exit")
 	GameSession.end_run(true)
 	failed += _check(GameSession.profile.progression.dungeon_conquered(&"cavern"), "conquest recorded")
 

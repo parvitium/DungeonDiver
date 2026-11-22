@@ -24,6 +24,8 @@ static func make_item(def: ItemDef, effective_tier: int, rng: GameRNG) -> ItemIn
 	item.rarity = rarity as DD.Rarity
 	item.item_level = effective_tier
 	item.stats = def.stats().scaled(scale_multiplier(rarity, effective_tier))
+	item.is_consumable = def.is_consumable
+	item.heal_amount = def.heal_amount
 	return item
 
 

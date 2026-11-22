@@ -13,7 +13,7 @@ func setup(p_item: ItemInstance) -> void:
 	add_child(visual)
 	var shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
-	sphere.radius = 0.7
+	sphere.radius = 0.42
 	shape.shape = sphere
 	add_child(shape)
 	var glow := OmniLight3D.new()
